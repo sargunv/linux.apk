@@ -8,14 +8,13 @@
 //!     and answering the caller go through the [`binder::driver::Userspace`]
 //!     trait, so it is unit tested on the host against [`fake`].
 //!   * `creds`: virtual credentials for Android's uids.
-//!   * `flat`: what the Flatpak sandbox's missing mounts would do.
+//!   * `fs`: what the Flatpak sandbox's missing mounts would do.
 //!   * `bpf`: eBPF objects and the rootless calls netd needs.
 //!   * [`input`]: session-local evdev devices the bridge feeds.
 //!   * [`ohos`] and [`ashmem`]: OpenHarmony's kernel extensions.
 //!
-//! `INNKEEPER_GUEST` selects the guest ([`guest`]), `INNKEEPER_BIONIC_HARNESS`
-//! the bootless harness ([`harness`]), `INNKEEPER_BROKER_DEBUG` tracing
-//! ([`init_log`]).
+//! `INNKEEPER_GUEST` selects the guest ([`guest`]), `INNKEEPER_BROKER_DEBUG`
+//! tracing ([`init_log`]).
 
 pub mod ashmem;
 pub mod binder;
@@ -23,7 +22,7 @@ mod bpf;
 mod creds;
 pub mod fake;
 pub mod filter;
-mod flat;
+mod fs;
 pub mod input;
 pub mod notify;
 pub mod ohos;
@@ -50,13 +49,6 @@ pub fn guest() -> Guest {
     })
 }
 
-/// The bootless bionic harness (`INNKEEPER_BIONIC_HARNESS=1`): real
-/// credentials and mounts, so no credential or Flatpak emulation. Read once.
-pub fn harness() -> bool {
-    static HARNESS: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *HARNESS.get_or_init(|| std::env::var("INNKEEPER_BIONIC_HARNESS").as_deref() == Ok("1"))
-}
-
 /// Verbose tracing (INNKEEPER_BROKER_DEBUG).
 pub static DEBUG: AtomicBool = AtomicBool::new(false);
 
@@ -76,7 +68,7 @@ const LOG_ROTATE: u64 = 64 << 20;
 
 /// Configure tracing from INNKEEPER_BROKER_DEBUG: unset, empty or "0" = off,
 /// "1" = stderr, anything else = a log file path. Tracing covers every binder
-/// call and, outside the harness, a line of syscall counters every 10 s.
+/// call and a line of syscall counters every 10 s.
 pub fn init_log() {
     let Some(v) = std::env::var_os("INNKEEPER_BROKER_DEBUG") else {
         return;

@@ -467,9 +467,6 @@ fn is_registration(packet: &[u8]) -> bool {
 
 impl Input {
     pub(crate) fn new(listener: RawFd, resp_sz: usize) -> Option<Self> {
-        if crate::harness() {
-            return None;
-        }
         let dir = std::path::Path::new(DIRECTORY);
         prepare_directories(std::path::Path::new("/dev")).ok()?;
         let path = "/dev/socket/innkeeper/evdev.sock";

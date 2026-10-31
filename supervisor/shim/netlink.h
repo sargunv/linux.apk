@@ -5,16 +5,15 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
-// Flatpak mode: concurrent sessions are separate pid namespaces on the host's
-// network, so a uevent socket bound to its pid (vold's) collides with another
-// session's. Let the kernel choose the port; other netlink protocols keep
-// theirs. A header of its own for supervisor/tests/shim-netlink.c.
+// Concurrent sessions are separate pid namespaces on the host's network, so a
+// uevent socket bound to its pid (vold's) collides with another session's. Let
+// the kernel choose the port; other netlink protocols keep theirs. A header of
+// its own for supervisor/tests/shim-netlink.c.
 static int innkeeper_netlink_bind(
-  int fd, const struct sockaddr* addr, socklen_t len, int flatpak
+  int fd, const struct sockaddr* addr, socklen_t len
 ) {
   if (
-    flatpak && addr && len >= sizeof(struct sockaddr_nl) &&
-    addr->sa_family == AF_NETLINK
+    addr && len >= sizeof(struct sockaddr_nl) && addr->sa_family == AF_NETLINK
   ) {
     int protocol;
     socklen_t size = sizeof(protocol);

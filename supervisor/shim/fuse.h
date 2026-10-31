@@ -14,7 +14,7 @@ static const char kEmulatedMount[] = "/mnt/user/0/emulated";
 
 static int fuse_enabled(void) {
   const char* e = getenv("INNKEEPER_EMULATED_STORAGE");
-  return e && !strcmp(e, "1") && flatpak();
+  return e && !strcmp(e, "1");
 }
 
 static int fuse_open(void) {

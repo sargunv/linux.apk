@@ -39,7 +39,7 @@ use crate::notify::{
     notif_id_valid, open_mem, read_path, send_resp, status_field, vm_read,
 };
 
-pub(crate) struct Flat {
+pub(crate) struct Fs {
     listener: RawFd,
     resp_sz: usize,
     /// (host dir, Android path), longest host dir first.
@@ -56,13 +56,13 @@ pub(crate) struct Flat {
 pub(crate) struct Workers(std::sync::mpsc::Sender<SeccompNotif>);
 
 impl Workers {
-    pub(crate) fn new(listener: RawFd, resp_sz: usize) -> Option<Self> {
+    pub(crate) fn new(listener: RawFd, resp_sz: usize) -> Self {
         use std::sync::{Arc, Mutex, mpsc};
-        let flat = Arc::new(Flat::from_env(listener, resp_sz)?);
+        let fs = Arc::new(Fs::from_env(listener, resp_sz));
         let (tx, rx) = mpsc::channel::<SeccompNotif>();
         let rx = Arc::new(Mutex::new(rx));
         for _ in 0..4 {
-            let flat = Arc::clone(&flat);
+            let fs = Arc::clone(&fs);
             let rx = Arc::clone(&rx);
             std::thread::spawn(move || {
                 loop {
@@ -74,27 +74,27 @@ impl Workers {
                         continue;
                     }
                     if req.data.nr as i64 == libc::SYS_openat {
-                        if !flat.openat(&req) {
-                            flat.cont(req.id);
+                        if !fs.openat(&req) {
+                            fs.cont(req.id);
                         }
                     } else {
-                        flat.serve(&req);
+                        fs.serve(&req);
                     }
                 }
             });
         }
-        Some(Self(tx))
+        Self(tx)
     }
 
     pub(crate) fn submit(&self, req: SeccompNotif) {
-        self.0.send(req).expect("Flatpak workers stopped");
+        self.0.send(req).expect("fs workers stopped");
     }
 }
 
 const SYS_FCHMODAT2: i64 = 452;
 
-/// The syscalls [`Flat::serve`] answers.
-pub(crate) fn is_flat_syscall(nr: i64) -> bool {
+/// The syscalls [`Fs::serve`] answers.
+pub(crate) fn is_fs_syscall(nr: i64) -> bool {
     matches!(
         nr,
         libc::SYS_readlinkat
@@ -112,10 +112,10 @@ pub(crate) fn is_flat_syscall(nr: i64) -> bool {
 
 /// The path map, for the credential side (`creds`): Android
 /// paths of mapped host dirs (such as `/data`) as host paths, so lookups
-/// that refuse symlinks can start past them. None in the harness.
+/// that refuse symlinks can start past them.
 pub(crate) fn to_host(p: &[u8]) -> Option<Vec<u8>> {
-    static F: std::sync::OnceLock<Option<Flat>> = std::sync::OnceLock::new();
-    let f = F.get_or_init(|| Flat::from_env(-1, 0)).as_ref()?;
+    static F: std::sync::OnceLock<Fs> = std::sync::OnceLock::new();
+    let f = F.get_or_init(|| Fs::from_env(-1, 0));
     for (host, android) in &f.map {
         if android.as_slice() == b"/" {
             // The composed root: "/" has a symlink to it per partition
@@ -166,9 +166,6 @@ pub(crate) fn init_as_pid1(pid: i32) -> i32 {
 /// The Android path a symlink (O_PATH fd) that stands in
 /// for a bind mount inside /data points to (see host/launcher/src/flatpak.rs).
 pub(crate) fn bind_target(link: &impl AsRawFd) -> Option<Vec<u8>> {
-    if crate::harness() {
-        return None;
-    }
     let mut buf = [0u8; 256];
     let n = unsafe {
         libc::readlinkat(
@@ -183,28 +180,21 @@ pub(crate) fn bind_target(link: &impl AsRawFd) -> Option<Vec<u8>> {
 }
 
 /// `st`'s owner as Android sees it: the user's ids are
-/// root's (see [`Flat::fstat`]).
+/// root's (see [`Fs::fstat`]).
 pub(crate) fn root_ids(st: &mut libc::stat) {
-    static IDS: std::sync::OnceLock<Option<(u32, u32)>> = std::sync::OnceLock::new();
-    let ids = IDS
-        .get_or_init(|| (!crate::harness()).then(|| unsafe { (libc::getuid(), libc::getgid()) }));
-    if let Some((u, g)) = *ids {
-        if st.st_uid == u {
-            st.st_uid = 0;
-        }
-        if st.st_gid == g {
-            st.st_gid = 0;
-        }
+    let (u, g) = unsafe { (libc::getuid(), libc::getgid()) };
+    if st.st_uid == u {
+        st.st_uid = 0;
+    }
+    if st.st_gid == g {
+        st.st_gid = 0;
     }
 }
 
-impl Flat {
+impl Fs {
     /// From `INNKEEPER_ROOT_MAP` (lines of
-    /// `<host dir>=<Android path>`), or None in the bootless developer harness.
-    pub(crate) fn from_env(listener: RawFd, resp_sz: usize) -> Option<Flat> {
-        if crate::harness() {
-            return None;
-        }
+    /// `<host dir>=<Android path>`).
+    pub(crate) fn from_env(listener: RawFd, resp_sz: usize) -> Fs {
         let spec = std::env::var("INNKEEPER_ROOT_MAP").unwrap_or_default();
         let mut map: Vec<(Vec<u8>, Vec<u8>)> = spec
             .lines()
@@ -218,14 +208,14 @@ impl Flat {
             .filter(|(h, _)| !h.is_empty())
             .collect();
         map.sort_by_key(|(h, _)| std::cmp::Reverse(h.len()));
-        Some(Flat {
+        Fs {
             listener,
             resp_sz,
             render_node: std::env::var_os("INNKEEPER_RENDER_NODE").map(Into::into),
             map,
             uid: unsafe { libc::getuid() },
             gid: unsafe { libc::getgid() },
-        })
+        }
     }
 
     /// `p` with a mapped host dir replaced by its Android path.
@@ -660,14 +650,14 @@ fn proc_path(tid: i32, p: &[u8]) -> Option<(Vec<u8>, bool)> {
 mod tests {
     use super::*;
 
-    fn flat(map: &str) -> Flat {
+    fn fs(map: &str) -> Fs {
         unsafe { std::env::set_var("INNKEEPER_ROOT_MAP", map) };
-        Flat::from_env(-1, 0).unwrap()
+        Fs::from_env(-1, 0)
     }
 
     #[test]
     fn chmod_path_names_the_callers_proc_fds() {
-        let f = Flat {
+        let f = Fs {
             listener: -1,
             resp_sz: 0,
             map: Vec::new(),
@@ -698,7 +688,7 @@ mod tests {
 
     #[test]
     fn paths_through_a_proc_self_link_name_the_callers() {
-        let f = Flat {
+        let f = Fs {
             listener: -1,
             resp_sz: 0,
             map: Vec::new(),
@@ -709,7 +699,7 @@ mod tests {
         let tid = unsafe { libc::syscall(libc::SYS_gettid) } as i32;
         // OpenHarmony's /data/storage -> /proc/self/fd/990: the kernel would
         // follow the link in the broker.
-        let dir = std::env::temp_dir().join(format!("innkeeper-flat-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("innkeeper-fs-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let link = dir.join("storage");
         let _ = std::fs::remove_file(&link);
@@ -726,7 +716,7 @@ mod tests {
 
     #[test]
     fn maps_host_dirs_to_android_paths() {
-        let f = flat("/var/r=/\n/var/d/data-x=/data\n/var/d/data-x/media=/storage/emulated");
+        let f = fs("/var/r=/\n/var/d/data-x=/data\n/var/d/data-x/media=/storage/emulated");
         assert_eq!(
             f.to_android(b"/var/r/system/lib64/libc.so", true),
             b"/system/lib64/libc.so"

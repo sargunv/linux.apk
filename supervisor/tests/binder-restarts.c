@@ -18,7 +18,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-extern int innkeeper_filter_install(int harness);
+extern int innkeeper_filter_install(void);
 extern void innkeeper_broker_start(int listener, int pins);
 
 enum { CLIENTS = 8, CALLS = 32, MAP_SIZE = 1024 * 1024 };
@@ -254,11 +254,10 @@ static void clients(void) {
 int main(void) {
   int sockets[2];
   if (socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sockets)) fail("socketpair");
-  setenv("INNKEEPER_BIONIC_HARNESS", "1", 1);
   pid_t child = fork();
   if (!child) {
     if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) fail("no_new_privs");
-    int fd = innkeeper_filter_install(1);
+    int fd = innkeeper_filter_install();
     if (fd < 0) fail("filter");
     char control[CMSG_SPACE(sizeof(int))] = {0}, byte = 0;
     struct iovec iov = {&byte, 1};

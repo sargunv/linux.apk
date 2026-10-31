@@ -2,8 +2,8 @@
 use std::os::fd::{FromRawFd, OwnedFd};
 
 #[unsafe(no_mangle)]
-extern "C" fn innkeeper_filter_install(harness: i32) -> i32 {
-    innkeeper_broker::filter::install(harness != 0).unwrap_or(-1)
+extern "C" fn innkeeper_filter_install() -> i32 {
+    innkeeper_broker::filter::install().unwrap_or(-1)
 }
 
 #[unsafe(no_mangle)]

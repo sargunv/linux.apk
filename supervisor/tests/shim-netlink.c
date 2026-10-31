@@ -5,15 +5,13 @@
 
 #include "../shim/netlink.h"
 
-static void check(int protocol, int flatpak, int allocated) {
+static void check(int protocol, int allocated) {
   int a = socket(AF_NETLINK, SOCK_DGRAM, protocol);
   int b = socket(AF_NETLINK, SOCK_DGRAM, protocol);
   assert(a >= 0 && b >= 0);
   struct sockaddr_nl address = {.nl_family = AF_NETLINK, .nl_pid = getpid()};
-  assert(
-    innkeeper_netlink_bind(a, (void*)&address, sizeof(address), flatpak) == 0
-  );
-  int rc = innkeeper_netlink_bind(b, (void*)&address, sizeof(address), flatpak);
+  assert(innkeeper_netlink_bind(a, (void*)&address, sizeof(address)) == 0);
+  int rc = innkeeper_netlink_bind(b, (void*)&address, sizeof(address));
   if (allocated) {
     assert(rc == 0);
     struct sockaddr_nl first, second;
@@ -31,11 +29,7 @@ static void check(int protocol, int flatpak, int allocated) {
 }
 
 int main(void) {
-  check(NETLINK_KOBJECT_UEVENT, 1, 1);
-  check(NETLINK_KOBJECT_UEVENT, 0, 0);
-  check(NETLINK_USERSOCK, 1, 0);
-  puts(
-    "ok   Flatpak uevent receivers allocate ports; host and request/reply "
-    "binds retain theirs"
-  );
+  check(NETLINK_KOBJECT_UEVENT, 1);
+  check(NETLINK_USERSOCK, 0);
+  puts("ok   uevent receivers allocate ports; request/reply binds keep theirs");
 }

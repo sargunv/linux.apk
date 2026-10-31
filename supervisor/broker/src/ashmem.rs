@@ -12,7 +12,7 @@
 //!
 //! The state lives in the memfd itself, so a region passed to another process
 //! answers the same there. c_utils also checks that the opened node is a
-//! character device: the broker's fstat ([`crate::flat`]) shows a region as
+//! character device: the broker's fstat ([`crate::fs`]) shows a region as
 //! [`RDEV`].
 
 use std::fs::File;
