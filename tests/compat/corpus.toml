@@ -6,9 +6,9 @@
 # https://f-droid.org/repo/index-v2.json. Prefer x86_64 or universal APKs
 # (`native` lists the ABIs the APK ships).
 #
-# Per app: framework = the UI framework or engine the APK is built with, for
-# the compatibility report (identified by hand from its libs and assets, see
-# tests/compat/README.md; the harness doesn't check it).
+# Per app: framework = the UI framework or engine the APK is built with
+# (identified by hand from its libs and assets, see tests/compat/README.md).
+# The harness reads neither `framework` nor `native`; they help pick apps.
 #
 # Per app, optional:
 #   settle = <seconds>  wait after launch before the first-frame check (default 8)

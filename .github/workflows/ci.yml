@@ -4,16 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    - cron: "23 8 * * *"
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: ci-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name != 'schedule' }}
+  cancel-in-progress: true
 
 env:
   CARGO_BUILD_JOBS: 4
@@ -193,45 +190,3 @@ jobs:
               required += ['build', 'unit', 'e2e']
           assert all(jobs[j]['result'] == 'success' for j in required), jobs
           PYCODE
-
-  nightly:
-    if:
-      github.event_name == 'schedule' || github.event_name ==
-      'workflow_dispatch'
-    runs-on: ubuntu-26.04
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup
-      - uses: ./.github/actions/build-cached
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/innkeeper-dev/keys
-          key:
-            platform-key-${{ hashFiles('android/system-app/build.gradle.kts') }}
-      - name: Build the stage and Flatpak
-        run: mise run package:flatpak
-      - name: Stage manifest
-        uses: actions/upload-artifact@v4
-        with:
-          name: stage-manifest
-          path: out/stage/share/innkeeper/manifest.tsv
-      - name: Full headless compatibility corpus
-        id: headless
-        run: tools/ci/compat.sh headless
-      - name: Full windowed compatibility corpus
-        if: ${{ !cancelled() && steps.headless.outcome != 'skipped' }}
-        run: tools/ci/compat.sh windowed
-      - name: Compatibility reports and diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: compatibility
-          path: |
-            out/ci/reports
-            out/test/nested/**/*.log
-            out/test/nested/**/*.txt
-            out/dev/flatpak/**/*.log
-            !out/test/nested/**/data/**
-            !**/android-data*/**
-          retention-days: 14

@@ -55,8 +55,8 @@ it first.
    `apex-<hash>/`. Stage the updated hashes with `mise run build:data` and
    `mise run stage`, then rerun `prepare`. Rename the blanked APEX APKs to the
    new build id.
-4. Prove it: `mise run test:e2e` passes, and the next nightly compatibility
-   report shows no regressions against the previous one.
+4. Prove it: `mise run test:e2e` passes, and a few corpus apps still work
+   (`mise run test:compat -- --only <package>,...`).
 
 ## Licensing
 

@@ -52,9 +52,7 @@ what each directory is and where it runs.
   under 60 s, waiting for observations, never fixed delays. GitHub Actions has
   its own deadline for its slower software-rendered desktop
   ([tests/README.md](tests/README.md)). The compat corpus is a manual harness
-  for one app (`mise run test:compat -- --only <package>`) plus a nightly CI
-  job. Never run the full corpus, and never trigger, run or wait for the nightly
-  job.
+  for one app (`mise run test:compat -- --only <package>`).
 - **Nested test desktops are fully isolated** (a nested plasmashell once started
   kded, KDE Connect and Akonadi against the user's real config, and nested
   portals opened dialogs on the real desktop): a private `dbus-run-session`, a

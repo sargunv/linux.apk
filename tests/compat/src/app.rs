@@ -24,14 +24,6 @@ pub enum Status {
 }
 
 impl Status {
-    pub fn rank(self) -> u8 {
-        match self {
-            Status::Works => 2,
-            Status::Partly => 1,
-            Status::Broken | Status::Error => 0,
-        }
-    }
-
     pub fn label(self) -> &'static str {
         match self {
             Status::Works => "Works",

@@ -15,16 +15,7 @@ runtime tests. Unknown paths, missing history and new branches run everything.
 PRs compare the base and merge commits; pushes compare the previous and current
 commit.
 
-Inspect a run with `gh run view <run-id>`. Don't dispatch the workflow to test
-CI changes: dispatch runs the nightly corpus.
-
-## Nightly
-
-The scheduled run (08:23 UTC) and `workflow_dispatch` run `package:flatpak`,
-then the full `test:compat` corpus headless and windowed (`compat.sh`). Each
-mode's report and session logs go to the `compatibility` artifact, also on
-failure. Both compare against the committed baseline, which the wrapper restores
-after each run.
+Inspect a run with `gh run view <run-id>`.
 
 ## Release
 

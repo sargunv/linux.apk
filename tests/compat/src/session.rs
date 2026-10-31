@@ -14,13 +14,6 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result, bail};
 use innkeeper_core::launcher;
 
-use crate::budget::Measured;
-
-/// How long the session idles after a cold start before its memory is read:
-/// past the 60 s after boot in which Android keeps the processes the boot
-/// broadcasts started (init.innkeeper.rc).
-const IDLE_SETTLE: Duration = Duration::from_secs(90);
-
 /// A session it started itself is stopped again when this is dropped, so a
 /// run leaves nothing running that it started.
 pub struct Session {
@@ -116,76 +109,6 @@ impl Session {
         String::from_utf8_lossy(&b).into_owned()
     }
 
-    /// Starts the run's session (headless unless `window`) and measures it,
-    /// or uses the one running (and measures nothing). A fresh /data's first
-    /// boot does extra work, so the cold start timed is a second start; idle
-    /// memory is read [`IDLE_SETTLE`] after it.
-    pub fn start_measured(&self, window: bool) -> Result<Measured> {
-        if self.running() {
-            eprintln!("compat: using the running session; not measuring its start or idle memory");
-            self.ensure(window)?;
-            return Ok(Measured::default());
-        }
-        self.started.set(true);
-        let first = self.boot_timed(window)?;
-        eprintln!("compat: session booted in {first:.1?}; restarting it to time a cold start");
-        self.stop()?;
-        let cold = self.boot_timed(window)?;
-        eprintln!("compat: cold session start {cold:.1?}; idle for {IDLE_SETTLE:?}");
-        sleep(IDLE_SETTLE);
-        let idle = self.memory_without_cache();
-        if let Some(mib) = idle {
-            eprintln!("compat: idle session memory {mib} MiB");
-        }
-        self.prepare_android();
-        Ok(Measured {
-            session_start_ms: Some(cold.as_millis() as u64),
-            idle_memory_mib: idle,
-            app_start_ms: None,
-        })
-    }
-
-    /// Starts the session and waits until Android has booted, polling more
-    /// often than [`launcher::Session::wait_booted`] does.
-    fn boot_timed(&self, window: bool) -> Result<Duration> {
-        // Admission waits for host memory are not Android startup time.
-        let ready = Command::new(&self.driver).arg("wait").status()?;
-        if !ready.success() {
-            bail!("the session driver could not admit a boot");
-        }
-        let t = Instant::now();
-        self.start(!window, &|m: &str| eprintln!("compat: {m}"))?;
-        while !self.booted() {
-            if !self.running() {
-                bail!("the session stopped while booting (see `innkeeper-session log`)");
-            }
-            if t.elapsed() > Duration::from_secs(300) {
-                bail!("the session did not finish booting in 300 s");
-            }
-            sleep(Duration::from_millis(100));
-        }
-        Ok(t.elapsed())
-    }
-
-    /// The session cgroup's memory without page cache (`memory.current`
-    /// less the file pages that aren't shmem), in MiB. Page cache is charged
-    /// to whichever cgroup read a file first, so it depends on what else has
-    /// read the image.
-    pub fn memory_without_cache(&self) -> Option<u64> {
-        let cg = self.cgroup()?;
-        let current: u64 = fs::read_to_string(cg.join("memory.current"))
-            .ok()?
-            .trim()
-            .parse()
-            .ok()?;
-        let stat = fs::read_to_string(cg.join("memory.stat")).ok()?;
-        let field = |k: &str| {
-            stat.lines()
-                .find_map(|l| l.strip_prefix(k)?.strip_prefix(' ')?.parse::<u64>().ok())
-        };
-        Some((current - field("file")? + field("shmem")?) >> 20)
-    }
-
     /// Makes sure a session is running and booted. Starts one (headless unless
     /// `window`) if none is running.
     pub fn ensure(&self, window: bool) -> Result<()> {
@@ -267,11 +190,6 @@ impl Session {
             sleep(Duration::from_secs(5));
         }
         bail!("Android did not come back in {limit:?}")
-    }
-
-    /// Whether the composer runs without host windows.
-    pub fn headless(&self) -> bool {
-        self.getprop("vendor.innkeeper.hwc.backend") == "headless"
     }
 }
 
