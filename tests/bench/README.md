@@ -42,10 +42,9 @@ Artifacts stay in `out/bench/<profile>/`: `result.json` (schema version 1),
 `summary.txt`, and bounded raw traces. Failed collections retain an error and
 return nonzero. Null statistics mean no observation, never zero latency. GPU
 components and audio round trips can be explicitly unavailable. Nothing is
-committed or published automatically. `INNKEEPER_BENCH_SCREENSHOT=1` optionally
-captures the probe window after collection on KWin (requires Spectacle).
-`measurement_complete: false` identifies missing components, and always prevents
-`valid_for_comparison`. Measurements are not recorded in source documentation.
+committed or published automatically. `measurement_complete: false` identifies
+missing components, and always prevents `valid_for_comparison`. Measurements are
+not recorded in source documentation.
 
 ## Measurements
 

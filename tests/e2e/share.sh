@@ -44,10 +44,6 @@ share_targets() {
   s logcat -d -s InnkeeperOpenWith:I | grep -E 'share action=android.intent.action.SEND_MULTIPLE files=2 apps=dev.sargunv.innkeeper.probes$' >/dev/null
 }
 until_ok share_targets
-if [[ ${INNKEEPER_SHARE_SCREENSHOT:-} == 1 ]]; then
-  until_ok chooser_ready
-  "$repo/tools/dev/window-shot.sh" "$T/share-chooser.png" 'Innkeeper System'
-fi
 choose_share
 until_ok received
 wm CLOSE --es package dev.sargunv.innkeeper.probes >/dev/null

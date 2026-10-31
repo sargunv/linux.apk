@@ -19,10 +19,7 @@ desktop_log=$repo/out/test/nested/$INNKEEPER_PROFILE/desktop.log
 bridge_log=$repo/out/test/nested/$INNKEEPER_PROFILE/state/innkeeper-$INNKEEPER_PROFILE/bridge.log
 apk=$repo/out/test/probes/InnkeeperProbes.apk
 # GitHub's software-rendered desktop is slower than local development.
-deadline=55
-if [[ ${GITHUB_ACTIONS:-} == true ]]; then
-  deadline=${INNKEEPER_E2E_DEADLINE:-55}
-fi
+deadline=${INNKEEPER_E2E_DEADLINE:-55}
 observation_wait=$(((20 * deadline + 54) / 55))
 timed() (
   local name=$1 start

@@ -505,12 +505,6 @@ fn collect(name: &str, out: &Path, seconds: u64) -> Result<Value> {
         }
         _ => bail!("unknown benchmark"),
     };
-    if result.is_ok() && std::env::var("INNKEEPER_BENCH_SCREENSHOT").is_ok_and(|v| v == "1") {
-        command(
-            "tools/dev/window-shot.sh",
-            &[out.join("probe.png").to_str().unwrap(), "Benchmark probe"],
-        )?;
-    }
     fs::write(
         out.join("gfxinfo.txt"),
         android(&[

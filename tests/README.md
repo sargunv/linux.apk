@@ -31,22 +31,13 @@ AudioRecord needs a visible activity. Setup waits for user 0's
 `RUNNING_UNLOCKED` before installing probes: boot completion can precede
 credential-encrypted app-data preparation. CI runs headless Mutter with llvmpipe
 (`INNKEEPER_TEST_COMPOSITOR=mutter LIBGL_ALWAYS_SOFTWARE=1`) and a 180 s
-deadline (`INNKEEPER_E2E_DEADLINE`, honoured only with `GITHUB_ACTIONS=true`);
-observation and group limits scale with it. Logs, captures and phase timings
-land in `out/test/e2e/<profile>/` and desktop logs in
-`out/test/nested/<profile>/`; CI uploads both as `checks-logs`. `desktop` checks
-real desktop policy through a capped bridge sidecar on the private desktop,
-without opening host apps or dialogs.
+deadline (`INNKEEPER_E2E_DEADLINE`); observation and group limits scale with it.
+Logs, captures and phase timings land in `out/test/e2e/<profile>/` and desktop
+logs in `out/test/nested/<profile>/`; CI uploads both as `checks-logs`.
+`desktop` checks real desktop policy through a capped bridge sidecar on the
+private desktop, without opening host apps or dialogs.
 
 - `mise run test:bionic`: manual Android-side HAL diagnostics.
 - `mise run test:compat -- --only <package>`: manual app troubleshooting; see
   [compat/README.md](compat/README.md). The full corpus runs only in nightly CI.
   Never trigger, run or wait for it during development or PR work.
-
-`tests/e2e/audio/capture.sh`, with a fresh `INNKEEPER_PROFILE` after a build, is
-a manual sustained-capture check outside the e2e gate. It first runs the
-Android-side input FMQ test against a fake PCM (`mise run build:audio`; no real
-audio), then records 32 s of a private 440 Hz source through AudioRecord, with a
-native monitor recording as a control, and requires the tone in every 100 ms
-window after warmup to catch gaps, dropped samples and transients. Results stay
-in `out/test/audio/<profile>/`.

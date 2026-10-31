@@ -59,6 +59,5 @@ priority, FMQ wrapping and wakeups, and paced capture without a bridge.
 `tests/abi.sh` checks the tinyalsa exports. The audio group of
 `mise run test:e2e` plays a 440 Hz tone into a private null sink and checks its
 frequency, then detects a known marker through AudioRecord from that sink's
-monitor. `tests/e2e/audio/capture.sh` verifies 30 s of continuous 440 Hz capture
-against a native control. `mise run bench -- audio` measures app-visible output
-latency and capture round trip.
+monitor. `mise run bench -- audio` measures app-visible output latency and
+capture round trip.

@@ -75,11 +75,6 @@ NoDisplay=true
 X-KDE-Wayland-Interfaces=org_kde_kwin_fake_input
 DESKTOP
 
-if [[ -n ${INNKEEPER_TEST_LAUNCHER_PORTAL:-} ]]; then
-  mkdir -p "$N/config/xdg-desktop-portal"
-  printf '[preferred]\norg.freedesktop.impl.portal.DynamicLauncher=%s\n' \
-    "$INNKEEPER_TEST_LAUNCHER_PORTAL" >"$N/config/xdg-desktop-portal/portals.conf"
-fi
 cat >"$N/hold.sh" <<HOLD
 #!/bin/sh
 echo "\$DBUS_SESSION_BUS_ADDRESS" >"$N/bus"
