@@ -12,7 +12,10 @@ trap 'report_error "$?" "$LINENO" "$BASH_COMMAND"' ERR
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(cd "$here/../.." && pwd)
 export INNKEEPER_PROFILE=${INNKEEPER_PROFILE:-e2e}
-export INNKEEPER_E2E=1 INNKEEPER_TEST=1
+export INNKEEPER_E2E=1
+# The nested desktop is the isolation: the session is a production one, and its
+# desktop requests reach desktop.py's fake portals and notifications.
+unset INNKEEPER_TEST
 S=$repo/tools/dev/session.sh
 T=$repo/out/test/e2e/$INNKEEPER_PROFILE
 desktop_log=$repo/out/test/nested/$INNKEEPER_PROFILE/desktop.log
@@ -359,11 +362,18 @@ if (
       echo 'ok   Open With opens the selected app with a readable file grant'
       "$here/share.sh"
       s am start -n dev.sargunv.innkeeper.probes/.HandoffProbe --es action view >/dev/null
-      until_ok file_has "$bridge_log" 'handoff: .*action 2, 1 files'
+      until_ok file_has "$desktop_log" '^openfile: shared\.odt$'
       wm CLOSE --es package dev.sargunv.innkeeper.probes >/dev/null
-      # Real desktop requests use a capped production-policy sidecar on the private bus.
-      # shellcheck source=tests/e2e/production.sh
-      source "$here/production.sh"
+      s am start -a android.intent.action.VIEW -d mailto:production-e2e@example.com >/dev/null
+      until_ok file_has "$desktop_log" '^openuri: mailto:production-e2e@example.com$'
+      s am start -n dev.sargunv.innkeeper.probes/.NotificationProbe >/dev/null
+      until_ok file_has "$desktop_log" '^notification: Ada Lovelace *: Are we still on for the demo at 3\?'
+      # No window is needed to exercise the picker result on Android's default display.
+      s am start -n dev.sargunv.innkeeper.probes/.DesktopProbe >/dev/null
+      until_ok file_has "$desktop_log" '^picker: Open File$'
+      until_ok log_has InnkeeperDesktopProbe 'picked: innkeeper-e2e-file'
+      wm CLOSE --es package dev.sargunv.innkeeper.probes >/dev/null
+      echo 'ok   handoff, VIEW, notification and PICK reached the private desktop fakes'
       ;;
     lifecycle)
       launch BenchProbe

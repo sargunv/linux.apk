@@ -27,7 +27,7 @@ pub fn absinfo(code: u16, value: i32) -> Option<Vec<u8>> {
 
 pub struct Feedback {
     fd: OwnedFd,
-    // Only a bridge in --test-session accepts synthetic host sources.
+    // Synthetic host sources: the e2e harness's fake gamepads.
     synthetic: bool,
     // Effects belong to this host open and the virtual endpoint that uploaded
     // them. They cannot outlive or move to a replacement host fd.

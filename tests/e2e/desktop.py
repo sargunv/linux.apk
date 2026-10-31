@@ -2,6 +2,7 @@
 """Desktop boundary fixtures, only on the runner's isolated session bus."""
 
 from pathlib import Path
+import os
 import sys
 
 import dbus
@@ -23,7 +24,7 @@ class Request(dbus.service.Object):
     pass
 
 
-class Portal(dbus.service.Object):
+class OpenUri(dbus.service.Object):
   def respond(self, options, sender, results):
     path = (
       f"{PATH}/request/{sender[1:].replace('.', '_')}/{options['handle_token']}"
@@ -48,6 +49,24 @@ class Portal(dbus.service.Object):
     print(f"openuri: {uri}", flush=True)
     return self.respond(options, sender, {})
 
+  @dbus.service.method(
+    "org.freedesktop.portal.OpenURI",
+    in_signature="sha{sv}",
+    out_signature="o",
+    sender_keyword="sender",
+  )
+  def OpenFile(self, parent, fd, options, sender):
+    fd = fd.take()
+    print(
+      f"openfile: {Path(os.readlink(f'/proc/self/fd/{fd}')).name}", flush=True
+    )
+    os.close(fd)
+    return self.respond(options, sender, {})
+
+
+# dbus-python finds a method by its Python name along the MRO, so FileChooser's
+# OpenFile lives in a subclass of OpenURI's.
+class Portal(OpenUri):
   @dbus.service.method(
     "org.freedesktop.portal.FileChooser",
     in_signature="ssa{sv}",

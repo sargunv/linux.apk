@@ -34,9 +34,9 @@ credential-encrypted app-data preparation. CI runs headless Mutter with llvmpipe
 deadline (`INNKEEPER_E2E_DEADLINE`, honoured only with `GITHUB_ACTIONS=true`);
 observation and group limits scale with it. Logs, captures and phase timings
 land in `out/test/e2e/<profile>/` and desktop logs in
-`out/test/nested/<profile>/`; CI uploads both as `checks-logs`. `desktop` checks
-real desktop policy through a capped bridge sidecar on the private desktop,
-without opening host apps or dialogs.
+`out/test/nested/<profile>/`; CI uploads both as `checks-logs`. The session runs
+without `INNKEEPER_TEST`, as a user's would: the nested desktop's fake portals
+and notifications (`tests/e2e/desktop.py`) stand in for the real desktop.
 
 - `mise run test:bionic`: manual Android-side HAL diagnostics.
 - `mise run test:compat -- --only <package>`: manual app troubleshooting; see
