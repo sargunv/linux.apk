@@ -38,17 +38,6 @@
 
 #define EXPORT __attribute__((visibility("default")))
 
-// In a Flatpak session, not the bootless developer harness, which runs with
-// real credentials and mounts.
-static int flatpak_state = -1;
-static int flatpak(void) {
-  if (flatpak_state < 0) {
-    const char* e = getenv("INNKEEPER_BIONIC_HARNESS");
-    flatpak_state = !(e && !strcmp(e, "1"));
-  }
-  return flatpak_state;
-}
-
 typedef unsigned short security_class_t;
 
 static const char kServiceContext[] = "u:r:innkeeper:s0";
@@ -131,7 +120,7 @@ static int is_selinux_xattr(const char* name) {
 // ACL has nothing to grant: skip it.
 static int is_skipped_xattr(const char* name) {
   if (is_selinux_xattr(name)) return 1;
-  return name && !strncmp(name, "system.posix_acl_", 17) && flatpak();
+  return name && !strncmp(name, "system.posix_acl_", 17);
 }
 
 EXPORT int fsetxattr(
@@ -250,9 +239,7 @@ EXPORT int __open_2(const char* path, int flags) {
   return do_open(path, flags, 0);
 }
 
-static long refused_ok(long rc) {
-  return rc != 0 && errno == EPERM && flatpak() ? 0 : rc;
-}
+static long refused_ok(long rc) { return rc != 0 && errno == EPERM ? 0 : rc; }
 EXPORT int mount(
   const char* src, const char* dst, const char* type, unsigned long flags,
   const void* data
@@ -287,7 +274,7 @@ EXPORT int setns(int fd, int nstype) {
 // as every desktop app does.
 static int netlink_accept_state = -1;
 static void netlink_accept(int fd, void* buf, long n) {
-  if (n <= 0 || !flatpak()) return;
+  if (n <= 0) return;
   if (netlink_accept_state < 0) {
     const char* e = getenv("INNKEEPER_NETLINK_ACCEPT");
     netlink_accept_state = e && !strcmp(e, "1");
@@ -328,7 +315,7 @@ EXPORT ssize_t recv(int fd, void* buf, size_t len, int flags) {
 // vold's uevent socket (netlink.h).
 #include "netlink.h"
 EXPORT int bind(int fd, const struct sockaddr* addr, socklen_t len) {
-  return innkeeper_netlink_bind(fd, addr, len, flatpak());
+  return innkeeper_netlink_bind(fd, addr, len);
 }
 // netdutils reads XFRM acks with read().
 EXPORT ssize_t read(int fd, void* buf, size_t len) {
@@ -355,7 +342,7 @@ static long psi_write(int fd, const void* buf, size_t n) {
   unsigned stall, window;
   if (psi_window_state < 0) {
     const char* e = getenv("INNKEEPER_PSI_WINDOW");
-    psi_window_state = e && !strcmp(e, "1") && flatpak();
+    psi_window_state = e && !strcmp(e, "1");
   }
   if (
     !psi_window_state || n < 8 || n > 48 ||
@@ -384,7 +371,7 @@ static long oom_write(int fd, const void* buf, size_t n) {
   if (floor == -2) {
     floor = -1;
     const char* e = getenv("INNKEEPER_OOM_ADJ");
-    if (e && !strcmp(e, "1") && flatpak()) {
+    if (e && !strcmp(e, "1")) {
       int f =
         syscall(SYS_openat, AT_FDCWD, "/proc/self/oom_score_adj", O_RDONLY);
       if (f >= 0) {
@@ -437,7 +424,7 @@ EXPORT ssize_t __write_chk(int fd, const void* buf, size_t n, size_t buf_size) {
 // emulated maps don't need (supervisor/broker/src/bpf.rs).
 EXPORT int socket(int domain, int type, int protocol) {
   long r = syscall(SYS_socket, domain, type, protocol);
-  if (r < 0 && errno == EAFNOSUPPORT && domain == AF_KEY && flatpak())
+  if (r < 0 && errno == EAFNOSUPPORT && domain == AF_KEY)
     return eventfd(0, (type & SOCK_CLOEXEC) ? EFD_CLOEXEC : 0);
   return r;
 }
@@ -460,7 +447,7 @@ EXPORT int clone(int (*fn)(void*), void* stack, int flags, void* arg, ...) {
   pid_t* ctid = va_arg(ap, pid_t*);
   va_end(ap);
   int r = real(fn, stack, flags, arg, ptid, tls, ctid);
-  if (r == -1 && errno == EPERM && flatpak() && (flags & CLONE_NEW_ALL))
+  if (r == -1 && errno == EPERM && (flags & CLONE_NEW_ALL))
     r = real(fn, stack, flags & ~CLONE_NEW_ALL, arg, ptid, tls, ctid);
   return r;
 }
@@ -527,7 +514,7 @@ static int vstat_state = -1;
 static int vstat_on(void) {
   if (vstat_state < 0) {
     const char* e = getenv("INNKEEPER_VSTAT");
-    vstat_state = e && !strcmp(e, "1") && flatpak();
+    vstat_state = e && !strcmp(e, "1");
   }
   return vstat_state;
 }
@@ -604,8 +591,7 @@ EXPORT int fstatat(int dirfd, const char* path, struct stat* st, int flags) {
   if (
     r == 0 && S_ISLNK(st->st_mode) && (flags & AT_SYMLINK_NOFOLLOW) &&
     (!strcmp(path, "/storage/emulated") || !strcmp(path, kEmulatedMount) ||
-     !strcmp(path, "/mnt/pass_through/0/emulated")) &&
-    flatpak()
+     !strcmp(path, "/mnt/pass_through/0/emulated"))
   )
     r = syscall(SYS_newfstatat, dirfd, path, st, flags & ~AT_SYMLINK_NOFOLLOW);
   if (r == 0 && vstat_on()) {

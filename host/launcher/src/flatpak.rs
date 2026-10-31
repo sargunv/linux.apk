@@ -7,7 +7,7 @@
 //!   composed once per image, stage and addons, and only the start-time layer
 //!   goes on at each start.
 //! - `/` gets symlinks to it, the binder nodes and socket dirs; the broker
-//!   shows the Android paths behind the links (supervisor/broker/src/flat.rs).
+//!   shows the Android paths behind the links (supervisor/broker/src/fs.rs).
 //! - init is the broker's child (execed from pivot-exec), and the session
 //!   lives as long as the process that started it, which serves the control
 //!   socket ([`crate::control`]).

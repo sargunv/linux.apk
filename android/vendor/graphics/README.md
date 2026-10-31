@@ -43,7 +43,6 @@ that touches gralloc buffers.
 
 Tests: `tests/host` runs in `mise run test` (layouts, every format, the mapper
 through `dlopen`, metadata across imports and `fork`, the frame dumper);
-`tests/android` (`gralloc_test`, `hwc_test`) runs in `mise run test:bionic`
-against the image's servicemanager and libui without booting. Start reading at
-`common/src/layout.cpp`, `composer/Display.cpp` and
-`composer/BridgePresenter.cpp`.
+`tests/android` (`gralloc_test`, `hwc_test`) runs in `mise run test:bionic` in a
+session with the framework stopped. Start reading at `common/src/layout.cpp`,
+`composer/Display.cpp` and `composer/BridgePresenter.cpp`.

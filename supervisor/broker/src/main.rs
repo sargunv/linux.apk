@@ -20,12 +20,10 @@ fn main() {
     let listener = fd(0);
     let pins = fd(1);
     let init = fd(2);
-    // pivot-exec execs us without changing pid. Reap orphans as its subreaper
-    // (pid 1 in the bootless harness), and end the session when init exits.
+    // pivot-exec execs us without changing pid. Reap orphans as its
+    // subreaper, and end the session when init exits.
     std::thread::spawn(move || reap(init));
-    if !innkeeper_broker::harness() {
-        unsafe { libc::umask(0) };
-    }
+    unsafe { libc::umask(0) };
     innkeeper_broker::notify::serve(
         listener,
         (pins >= 0).then(|| unsafe { OwnedFd::from_raw_fd(pins) }),
@@ -76,8 +74,7 @@ fn init(args: &[std::ffi::OsString]) -> ! {
     argv_ptr.push(std::ptr::null());
     let mut env_ptr: Vec<_> = env.iter().map(|s| s.as_ptr()).collect();
     env_ptr.push(std::ptr::null());
-    let listener = innkeeper_broker::filter::install(innkeeper_broker::harness())
-        .expect("install seccomp filter");
+    let listener = innkeeper_broker::filter::install().expect("install seccomp filter");
     unsafe {
         // A usize buffer gives cmsghdr its required alignment.
         let mut control = [0usize; 4];

@@ -50,4 +50,4 @@ compute, udmabuf import, ANB images, deferred binds), `swapchain_test`,
 EGLImage as Skia imports them) on lavapipe plus the hardware driver a normal
 launcher session selects. On hybrids that is only the selected GPU, since the
 broker permits only its node. Each invocation uses a fresh named Android
-session; `INNKEEPER_BIONIC_HARNESS=1` runs without booting Android.
+session.

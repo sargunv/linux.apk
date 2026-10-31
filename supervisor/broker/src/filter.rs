@@ -53,7 +53,7 @@ fn rule(f: &mut Vec<Insn>, nr: i64, args: &[(u32, u32, u32)]) {
 /// Waits stay interruptible for ptrace and job control; binder restarts are
 /// made idempotent by the broker.
 #[allow(clippy::unnecessary_cast)] // RLIMIT_* is i32 on bionic, u32 on glibc.
-pub fn install(harness: bool) -> std::io::Result<i32> {
+pub fn install() -> std::io::Result<i32> {
     use libc::*;
     let mut f = vec![insn(0x20, 4), insn(0x15, 0xc000003e), insn(0x06, ALLOW)];
     f[1].jt = 1; // Other architectures retain the kernel's handling.
@@ -66,72 +66,68 @@ pub fn install(harness: bool) -> std::io::Result<i32> {
             rule(&mut f, SYS_ioctl, &[(1, 0xff00, (ty as u32) << 8)]);
         }
     }
-    if !harness {
-        rule(&mut f, SYS_inotify_add_watch, &[]);
-    }
+    rule(&mut f, SYS_inotify_add_watch, &[]);
     rule(&mut f, SYS_ioctl, &[(1, 0xff00, (b'E' as u32) << 8)]);
     rule(&mut f, SYS_ioctl, &[(1, 0xff00, (b'b' as u32) << 8)]);
-    if !harness {
-        for nr in [
-            SYS_getuid,
-            SYS_geteuid,
-            SYS_getgid,
-            SYS_getegid,
-            SYS_getresuid,
-            SYS_getresgid,
-            SYS_getgroups,
-            SYS_setuid,
-            SYS_setgid,
-            SYS_setreuid,
-            SYS_setregid,
-            SYS_setresuid,
-            SYS_setresgid,
-            SYS_setfsuid,
-            SYS_setfsgid,
-            SYS_setgroups,
-            SYS_chown,
-            SYS_fchown,
-            SYS_lchown,
-            SYS_fchownat,
-            SYS_readlinkat,
-            SYS_readlink,
-            SYS_getcwd,
-            SYS_fstat,
-            SYS_capget,
-            SYS_capset,
-            SYS_mkdir,
-            SYS_mkdirat,
-            SYS_chmod,
-            SYS_fchmod,
-            SYS_fchmodat,
-            452, /* fchmodat2 */
-        ] {
-            rule(&mut f, nr, &[]);
-        }
-        for nr in [SYS_faccessat, SYS_faccessat2] {
-            rule(&mut f, nr, &[(2, W_OK as u32, W_OK as u32)]);
-        }
-        rule(
-            &mut f,
-            SYS_newfstatat,
-            &[
-                (0, !0, AT_FDCWD as u32),
-                (3, !0, AT_SYMLINK_NOFOLLOW as u32),
-            ],
-        );
-        rule(
-            &mut f,
-            SYS_getsockopt,
-            &[(1, !0, SOL_SOCKET as u32), (2, !0, SO_PEERCRED as u32)],
-        );
-        rule(
-            &mut f,
-            SYS_setsockopt,
-            &[(1, !0, SOL_SOCKET as u32), (2, !0, SO_MARK as u32)],
-        );
-        for op in [PR_SET_SECUREBITS, PR_CAPBSET_DROP, PR_CAP_AMBIENT] {
-            rule(&mut f, SYS_prctl, &[(0, !0, op as u32)]);
-        }
+    for nr in [
+        SYS_getuid,
+        SYS_geteuid,
+        SYS_getgid,
+        SYS_getegid,
+        SYS_getresuid,
+        SYS_getresgid,
+        SYS_getgroups,
+        SYS_setuid,
+        SYS_setgid,
+        SYS_setreuid,
+        SYS_setregid,
+        SYS_setresuid,
+        SYS_setresgid,
+        SYS_setfsuid,
+        SYS_setfsgid,
+        SYS_setgroups,
+        SYS_chown,
+        SYS_fchown,
+        SYS_lchown,
+        SYS_fchownat,
+        SYS_readlinkat,
+        SYS_readlink,
+        SYS_getcwd,
+        SYS_fstat,
+        SYS_capget,
+        SYS_capset,
+        SYS_mkdir,
+        SYS_mkdirat,
+        SYS_chmod,
+        SYS_fchmod,
+        SYS_fchmodat,
+        452, /* fchmodat2 */
+    ] {
+        rule(&mut f, nr, &[]);
+    }
+    for nr in [SYS_faccessat, SYS_faccessat2] {
+        rule(&mut f, nr, &[(2, W_OK as u32, W_OK as u32)]);
+    }
+    rule(
+        &mut f,
+        SYS_newfstatat,
+        &[
+            (0, !0, AT_FDCWD as u32),
+            (3, !0, AT_SYMLINK_NOFOLLOW as u32),
+        ],
+    );
+    rule(
+        &mut f,
+        SYS_getsockopt,
+        &[(1, !0, SOL_SOCKET as u32), (2, !0, SO_PEERCRED as u32)],
+    );
+    rule(
+        &mut f,
+        SYS_setsockopt,
+        &[(1, !0, SOL_SOCKET as u32), (2, !0, SO_MARK as u32)],
+    );
+    for op in [PR_SET_SECUREBITS, PR_CAPBSET_DROP, PR_CAP_AMBIENT] {
+        rule(&mut f, SYS_prctl, &[(0, !0, op as u32)]);
     }
     for nr in [SYS_bpf, SYS_statfs, SYS_getxattr, SYS_lgetxattr] {
         rule(&mut f, nr, &[]);

@@ -1,9 +1,8 @@
 // Which syscalls does the session's seccomp filter (broker/src/filter.rs) turn
 // into user notifications? Built and run by seccomp-filter.sh on the host.
-// A child installs the filter (bootless harness, virtual credentials and
-// Flatpak variants) and serves its listener; a grandchild makes each probe
-// syscall, and the child records which ones arrived as notifications and lets
-// them continue.
+// A child installs the filter and serves its listener; a grandchild makes each
+// probe syscall, and the child records which ones arrived as notifications and
+// lets them continue.
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
@@ -19,7 +18,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-extern int innkeeper_filter_install(int harness);
+extern int innkeeper_filter_install(void);
 
 struct probe {
   const char* name;
@@ -63,9 +62,9 @@ static struct probe probes[] = {
 #define NPROBES (int)(sizeof(probes) / sizeof(probes[0]))
 
 // Prints one line per probe: "<name> <0|1>" (1 = notified).
-static int run(int harness) {
+static int run(void) {
   if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) return 1;
-  int lfd = innkeeper_filter_install(harness);
+  int lfd = innkeeper_filter_install();
   if (lfd < 0) return perror("filter"), 1;
   static struct stat st;
   for (int i = 0; i < NPROBES; i++)
@@ -120,14 +119,11 @@ static int run(int harness) {
     resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
     ioctl(lfd, SECCOMP_IOCTL_NOTIF_SEND, resp);
   }
-  // dprintf: stdio would fstat stdout, which Flatpak mode traps, under this
+  // dprintf: stdio would fstat stdout, which the filter traps, under this
   // process's own filter.
   for (int i = 0; i < NPROBES; i++)
     dprintf(1, "%s %d\n", probes[i].name, seen[i]);
   return 0;
 }
 
-int main(int argc, char** argv) {
-  if (argc != 2) return 2;
-  return run(atoi(argv[1]));
-}
+int main(void) { return run(); }

@@ -10,7 +10,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-extern int innkeeper_filter_install(int harness);
+extern int innkeeper_filter_install(void);
 extern void innkeeper_broker_start(int listener, int pins);
 
 int main(void) {
@@ -21,8 +21,7 @@ int main(void) {
   if (child == 0) {
     alarm(5);
     if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) _exit(1);
-    // Only openat/binder ioctls need trapping for this host-side probe.
-    int listener = innkeeper_filter_install(1);
+    int listener = innkeeper_filter_install();
     if (listener < 0) _exit(1);
     char control[CMSG_SPACE(sizeof(int))] = {0};
     char byte = 0;

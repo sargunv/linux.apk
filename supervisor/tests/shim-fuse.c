@@ -5,8 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-static int sandboxed = 1;
-static int flatpak(void) { return sandboxed; }
 #include "../shim/fuse.h"
 
 static int mount_volume(void) {
@@ -30,9 +28,6 @@ int main(void) {
   unsetenv("INNKEEPER_EMULATED_STORAGE");
   assert(fuse_open() == -1);
   setenv("INNKEEPER_EMULATED_STORAGE", "1", 1);
-  sandboxed = 0;
-  assert(fuse_open() == -1);
-  sandboxed = 1;
   for (int round = 0; round < 2; round++) {
     int fd = mount_volume();
     assert(fuse_open() == -1 && errno == ENODEV);

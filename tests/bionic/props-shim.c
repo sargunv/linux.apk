@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// LD_PRELOADed into every process of tests/bionic/run.sh, which runs Android
-// binaries without init. Test only; never installed.
-//  - __system_property_*: no property service. A per-process store, seeded
-//    with servicemanager.ready=true (libbinder's defaultServiceManager() waits
+// LD_PRELOADed into a test program by tests/bionic/run.sh when it sets
+// read-only properties, which the session's property service has already
+// seeded. Test only; never installed.
+//  - __system_property_*: a per-process store, seeded with
+//    servicemanager.ready=true (libbinder's defaultServiceManager() waits
 //    for it) and INNKEEPER_PROPS="name=value;name=value".
-//  - selinux_status_*: no selinuxfs; servicemanager CHECKs
-//    selinux_status_open().
-//  - __android_log_write_log_message: no logd; mirror logs to stderr.
+//  - __android_log_write_log_message: mirror logs to stderr, the runner's
+//    output.
 #include <pthread.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -17,16 +17,6 @@
 #include <time.h>
 
 #define EXPORT __attribute__((visibility("default")))
-
-EXPORT int selinux_status_open(int fallback) {
-  (void)fallback;
-  return 0;
-}
-EXPORT void selinux_status_close(void) {}
-EXPORT int selinux_status_updated(void) { return 0; }
-EXPORT int selinux_status_getenforce(void) { return 0; }
-EXPORT int selinux_status_policyload(void) { return 0; }
-EXPORT int selinux_status_deny_unknown(void) { return 0; }
 
 struct __android_log_message {
   size_t struct_size;

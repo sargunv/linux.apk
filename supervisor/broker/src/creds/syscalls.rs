@@ -635,7 +635,7 @@ impl Vid {
                     uc.gid = AID_NOBODY;
                 }
             }
-            uc.pid = ns_pid(peer).map_or(0, crate::flat::init_as_pid1);
+            uc.pid = ns_pid(peer).map_or(0, crate::fs::init_as_pid1);
         }
         let n = (len as usize).min(size_of::<libc::ucred>());
         let bytes: [u8; 12] = unsafe { std::mem::transmute(uc) };
@@ -791,7 +791,7 @@ fn resolve_how(
     let mut abs: Option<Vec<u8>> = None;
     if path[0] == b'/' {
         // /data is a symlink to its host dir.
-        abs = Some(crate::flat::to_host(path).unwrap_or_else(|| path.to_vec()));
+        abs = Some(crate::fs::to_host(path).unwrap_or_else(|| path.to_vec()));
     } else {
         let link = if dirfd == AT_FDCWD {
             format!("/proc/{tid}/cwd")
@@ -880,7 +880,7 @@ fn lstat(j: &Job, listener: RawFd, mem: MemFd) -> Answer {
     // A bind mount inside /data is a symlink to another /data
     // dir (/data/user/0 -> /data/data); show what it stands for.
     if st.st_mode & libc::S_IFMT == libc::S_IFLNK
-        && let Some(target) = crate::flat::bind_target(&fd)
+        && let Some(target) = crate::fs::bind_target(&fd)
         && let Ok(t) = resolve_how(j.tid, AT_FDCWD, &target, true, RESOLVE_NO_SYMLINKS)
         && unsafe { libc::fstatat(t.as_raw_fd(), c"".as_ptr(), &mut st, AT_EMPTY_PATH as i32) } == 0
     {
@@ -893,7 +893,7 @@ fn lstat(j: &Job, listener: RawFd, mem: MemFd) -> Answer {
         st.st_uid = u;
         st.st_gid = g;
     } else {
-        crate::flat::root_ids(&mut st);
+        crate::fs::root_ids(&mut st);
     }
     let b = unsafe {
         std::slice::from_raw_parts(

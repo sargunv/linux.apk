@@ -235,8 +235,8 @@ impl ProcState {
 pub struct Supervisor {
     broker: BinderDriver,
     us: SeccompUserspace,
-    /// Virtual ids, outside the harness (binder's sender_euid comes from them).
-    vid: Option<Arc<crate::creds::Vid>>,
+    /// Virtual ids (binder's sender_euid comes from them).
+    vid: Arc<crate::creds::Vid>,
     /// (tgid, fd) -> broker process
     fd_index: HashMap<(i32, u32), ProcId>,
     tgids: HashMap<i32, i32>,
@@ -598,8 +598,8 @@ pub fn serve(listener: RawFd, pins: Option<OwnedFd>) {
         at: AtomicU64::new(u64::MAX),
     });
     // Virtual ids for every process (supervisor/README.md).
-    let vid = (!crate::harness()).then(|| crate::creds::Vid::new(listener, resp_sz));
-    let flat = crate::flat::Workers::new(listener, resp_sz);
+    let vid = crate::creds::Vid::new(listener, resp_sz);
+    let fs = crate::fs::Workers::new(listener, resp_sz);
     let input = crate::input::Input::new(listener, resp_sz);
     let sup = Arc::new(Mutex::new(Supervisor {
         broker: BinderDriver::with_guest(crate::guest()),
@@ -613,7 +613,7 @@ pub fn serve(listener: RawFd, pins: Option<OwnedFd>) {
             timer: Arc::clone(&timer),
             tokens: Default::default(),
         },
-        vid: vid.clone(),
+        vid: Arc::clone(&vid),
         fd_index: HashMap::new(),
         tgids: HashMap::new(),
         next_memfd: 1,
@@ -647,16 +647,12 @@ pub fn serve(listener: RawFd, pins: Option<OwnedFd>) {
             send_continue(listener, resp_sz, req.id);
             continue;
         }
-        if let Some(v) = &vid
-            && crate::creds::is_cred_syscall(nr, &req.data.args)
-        {
-            v.serve(&req);
+        if crate::creds::is_cred_syscall(nr, &req.data.args) {
+            vid.serve(&req);
             continue;
         }
-        if let Some(f) = &flat
-            && crate::flat::is_flat_syscall(nr)
-        {
-            f.submit(req);
+        if crate::fs::is_fs_syscall(nr) {
+            fs.submit(req);
             continue;
         }
         if !is_binder_syscall(nr, &req.data.args) {
@@ -664,20 +660,13 @@ pub fn serve(listener: RawFd, pins: Option<OwnedFd>) {
             continue;
         }
         // /proc/<pid>/status with the virtual ids.
-        if nr == libc::SYS_openat
-            && let Some(v) = &vid
-            && v.proc_status(&req)
-        {
+        if nr == libc::SYS_openat && vid.proc_status(&req) {
             continue;
         }
         // Every openat in the session lands here: let the ones that can't be a
         // binder device through without taking the lock.
         if nr == libc::SYS_openat && !binder_path(req.pid as i32, req.data.args[1]) {
-            if let Some(f) = &flat {
-                f.submit(req);
-            } else {
-                send_continue(listener, resp_sz, req.id);
-            }
+            fs.submit(req);
             continue;
         }
         sup.lock().unwrap().dispatch(req);
@@ -921,12 +910,7 @@ impl Supervisor {
         }
         // The opener's (virtual) euid, as the kernel records proc->cred at
         // open.
-        let euid = match &self.vid {
-            Some(v) => v.creds(pid).map(|c| c.euid).unwrap_or(0),
-            None => status_field(pid, "Uid:")
-                .and_then(|u| u.split_whitespace().nth(1).and_then(|v| v.parse().ok()))
-                .unwrap_or(0),
-        };
+        let euid = self.vid.creds(pid).map_or(0, |c| c.euid);
         // NSpid: <this ns> <android ns> [...]; report the Android-namespace pid.
         let ns_pid = status_field(pid, "NSpid:")
             .and_then(|v| {
