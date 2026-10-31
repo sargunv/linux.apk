@@ -139,8 +139,6 @@ pub(crate) struct Vid {
     resp_sz: usize,
     jobs: Mutex<mpsc::Sender<Job>>,
     stats: Stats,
-    /// Android pid -> outer pid, for /proc/<pid>/status.
-    pids: Mutex<std::collections::HashMap<u32, i32>>,
 }
 
 impl Vid {
@@ -152,7 +150,6 @@ impl Vid {
             resp_sz,
             jobs: Mutex::new(tx),
             stats: Stats::default(),
-            pids: Mutex::new(std::collections::HashMap::new()),
         });
         let rx = Arc::new(Mutex::new(rx));
         for _ in 0..4 {
@@ -472,41 +469,20 @@ impl Vid {
 
     fn serve_status(&self, req: &SeccompNotif, which: table::ProcStatus) -> bool {
         let tid = req.pid as i32;
-        // The file as Android's procfs shows it (its pid numbering), read
-        // through the caller's root, and the subject's outer pid (for its
-        // rlimit). Pids Android can't see stay with the kernel (ENOENT).
-        let ns = |key: &str, t: i32| -> Option<u32> {
-            let v = status_field(t, key)?;
-            let f: Vec<&str> = v.split_whitespace().collect();
-            f.get(1).or(f.first())?.parse().ok()
-        };
+        // The file and the process whose ids replace its own. A missing pid
+        // stays with the kernel (ENOENT).
         let (path, subject) = match which {
             table::ProcStatus::Myself => {
-                let (Some(p), Some(o)) = (
-                    ns("NStgid:", tid),
-                    status_field(tid, "Tgid:").and_then(|v| v.parse::<i32>().ok()),
-                ) else {
+                let Some(p) = status_field(tid, "Tgid:").and_then(|v| v.parse::<i32>().ok()) else {
                     return false;
                 };
-                (format!("{p}"), o)
+                (format!("{p}"), p)
             }
-            table::ProcStatus::MyThread => {
-                let (Some(p), Some(t)) = (ns("NStgid:", tid), ns("NSpid:", tid)) else {
-                    return false;
-                };
-                (format!("{p}/task/{t}"), tid)
-            }
-            table::ProcStatus::Pid(p) => match self.outer_pid(p) {
-                Some(o) => (format!("{p}"), o),
-                None => return false,
-            },
-            table::ProcStatus::Task(p, t) => match self.outer_pid(t) {
-                Some(o) => (format!("{p}/task/{t}"), o),
-                None => return false,
-            },
+            table::ProcStatus::MyThread => (format!("{tid}"), tid),
+            table::ProcStatus::Pid(p) => (format!("{p}"), p as i32),
+            table::ProcStatus::Task(p, t) => (format!("{p}/task/{t}"), t as i32),
         };
-        let Ok(real) = std::fs::read_to_string(format!("/proc/{tid}/root/proc/{path}/status"))
-        else {
+        let Ok(real) = std::fs::read_to_string(format!("/proc/{path}/status")) else {
             return false;
         };
         let Some(c) = self.creds(subject) else {
@@ -546,33 +522,6 @@ impl Vid {
             crate::notify::send_resp(self.listener, self.resp_sz, req.id, 0, 0, true);
             true
         }
-    }
-
-    /// The outer pid of Android pid `p` (cached; a miss rescans /proc).
-    fn outer_pid(&self, p: u32) -> Option<i32> {
-        let mut m = self.pids.lock().unwrap();
-        if let Some(&o) = m.get(&p)
-            && ns_pid(o) == Some(p as i32)
-        {
-            return Some(o);
-        }
-        m.clear();
-        for e in std::fs::read_dir("/proc").ok()?.flatten() {
-            let Ok(o) = e.file_name().to_string_lossy().parse::<i32>() else {
-                continue;
-            };
-            // Threads too: /proc/<tgid>/task/<tid>.
-            let tasks = std::fs::read_dir(format!("/proc/{o}/task")).ok();
-            for t in tasks.into_iter().flatten().flatten() {
-                let Ok(ot) = t.file_name().to_string_lossy().parse::<i32>() else {
-                    continue;
-                };
-                if let Some(n) = ns_pid(ot) {
-                    m.insert(n as u32, ot);
-                }
-            }
-        }
-        m.get(&p).copied()
     }
 
     /// The caller's address space, for a call that transfers memory: pinned
@@ -635,7 +584,7 @@ impl Vid {
                     uc.gid = AID_NOBODY;
                 }
             }
-            uc.pid = ns_pid(peer).map_or(0, crate::fs::init_as_pid1);
+            uc.pid = crate::fs::init_as_pid1(peer);
         }
         let n = (len as usize).min(size_of::<libc::ucred>());
         let bytes: [u8; 12] = unsafe { std::mem::transmute(uc) };
@@ -716,13 +665,6 @@ fn caps(tid: i32, c: &Creds) -> table::Caps {
         setgid: eff & (1 << 6) != 0,
         setuid: eff & (1 << 7) != 0,
     }
-}
-
-/// `pid`'s pid in Android's (the nested) pid namespace.
-fn ns_pid(pid: i32) -> Option<i32> {
-    let v = status_field(pid, "NSpid:")?;
-    let f: Vec<&str> = v.split_whitespace().collect();
-    f.get(1).or(f.first())?.parse().ok()
 }
 
 /// A duplicate of fd `fd` of thread `tid`.
