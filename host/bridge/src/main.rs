@@ -1,5 +1,5 @@
 //! `innkeeper-bridge --run-dir DIR --state-dir DIR [--allow-uid UID]...
-//!                  [--system-app-dir DIR] [--mirror-apps] [--test-session]
+//!                  [--system-app-dir DIR] [--test-session]
 //!                  [--sink NAME] [-v]`
 //!
 //! Listens on `<run-dir>/bridge/bridge.sock` (the launcher binds
@@ -13,10 +13,9 @@
 //!   from the host; its owner may use the system, documents, apps,
 //!   hoststate, input and a11y services. Nobody else may use input, a11y or
 //!   apps.
-//! - `--mirror-apps`: desktop entries for apps installed inside Android.
 //! - `--test-session` (also `INNKEEPER_TEST=1`): isolates the clipboard,
 //!   portals, OpenURI, notifications, MPRIS, AT-SPI and location from the
-//!   desktop, and turns off `--mirror-apps`.
+//!   desktop, and gives apps installed inside Android no desktop entries.
 //! - `--sink`: the PipeWire sink for audio (default: the desktop's default).
 //! - `-v`: per-stream statistics.
 
@@ -40,7 +39,6 @@ fn main() -> Result<()> {
     let mut allow = Vec::new();
     let mut sink = None;
     let mut system_app_dir: Option<PathBuf> = None;
-    let mut mirror_apps = false;
     let mut test_session = std::env::var("INNKEEPER_TEST").is_ok_and(|v| v == "1");
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
@@ -56,7 +54,6 @@ fn main() -> Result<()> {
                     .context("bad uid")?,
             ),
             "--sink" => sink = Some(args.next().context("--sink needs a name")?),
-            "--mirror-apps" => mirror_apps = true,
             "--test-session" => test_session = true,
             "--system-app-dir" => {
                 system_app_dir = Some(args.next().context("--system-app-dir needs a path")?.into())
@@ -66,7 +63,6 @@ fn main() -> Result<()> {
         }
     }
     let desktop = !test_session;
-    let mirror_apps = mirror_apps && !test_session;
     let run_dir = run_dir.context("--run-dir is required")?;
     let state_dir = state_dir.context("--state-dir is required")?;
     let socket = run_dir.join("bridge/bridge.sock");
@@ -175,10 +171,10 @@ fn main() -> Result<()> {
             ),
         ))
     });
-    // Apps installed inside Android get desktop entries; only with
-    // --mirror-apps (the main session).
+    // Apps installed inside Android get desktop entries, except in a test
+    // session.
     let session_api = innkeeper_bridge::apps::session::Relay::default();
-    let apps = Arc::new(innkeeper_bridge::apps::Config::from_env(mirror_apps));
+    let apps = Arc::new(innkeeper_bridge::apps::Config::from_env(desktop));
     let _session_bus = match session_api.serve(for_preferences, apps.clone(), session_hub) {
         Ok(bus) => Some(bus),
         Err(e) => {
@@ -186,7 +182,7 @@ fn main() -> Result<()> {
             None
         }
     };
-    innkeeper_bridge::info!("apps: mirroring {}", if mirror_apps { "on" } else { "off" });
+    innkeeper_bridge::info!("apps: mirroring {}", if desktop { "on" } else { "off" });
     services.register(service::APPS, "apps", move |peer, events| {
         Ok(Box::new(
             innkeeper_bridge::apps::AppsService::new(apps.clone(), peer)

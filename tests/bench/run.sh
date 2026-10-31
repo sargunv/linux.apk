@@ -9,7 +9,7 @@ case ${1:-} in
     exit 0
     ;;
 esac
-export INNKEEPER_PROFILE=${INNKEEPER_PROFILE:-bench-$1-$(date +%s%N)}
+export INNKEEPER_PROFILE=${INNKEEPER_PROFILE:-bench-$1-$(date +%s%N)} INNKEEPER_TEST=1
 [[ $INNKEEPER_PROFILE =~ ^bench-[a-z0-9-]+$ ]] || {
   echo 'expected fresh bench-* profile' >&2
   exit 1

@@ -164,8 +164,6 @@ run = "tests/e2e/run.sh"
 
 [tasks."test:compat"]
 description = "Manual app troubleshooting (-- --only PKG); full corpus only in nightly CI, never a gate"
-# A named profile (default compat), so a test session: links are only logged,
-# and notifications and media players stay off the real desktop.
 env = { INNKEEPER_PROFILE = "{{ env.INNKEEPER_PROFILE | default(value='compat') }}" }
 run = "tests/compat/run.sh"
 

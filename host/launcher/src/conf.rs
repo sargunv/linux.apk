@@ -70,7 +70,7 @@ impl Config {
             paths,
             image,
         };
-        c.bridge_setup();
+        c.bridge_setup(env::var("INNKEEPER_TEST").is_ok_and(|v| v == "1"));
         c
     }
 
@@ -94,7 +94,7 @@ impl Config {
     /// socket dir is Android's `/dev/socket/innkeeper`, and it only accepts
     /// Android root, system and audioserver (SO_PEERCRED, as host ids), plus
     /// the system app's uid (the owner of its data dir).
-    fn bridge_setup(&mut self) {
+    fn bridge_setup(&mut self, test: bool) {
         let p = &self.paths;
         let a = &mut self.bridge_args;
         for (k, v) in [
@@ -123,11 +123,9 @@ impl Config {
         let bus = env::var("DBUS_SESSION_BUS_ADDRESS")
             .ok()
             .filter(|v| !v.is_empty());
-        if !p.profile.is_empty() || env::var("INNKEEPER_TEST").is_ok_and(|v| v == "1") {
+        if test {
             // Persist isolation in session.conf, including across wakeups.
             a.push("--test-session".into());
-        } else {
-            a.push("--mirror-apps".into());
         }
         // The display service and the clipboard use the host compositor; the
         // system service the caller's session bus; desktop entries for apps
@@ -159,5 +157,54 @@ impl Config {
                 e.insert(v.into(), d);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config(profile: &str) -> Config {
+        let dir = PathBuf::from("/nonexistent");
+        Config {
+            headless: true,
+            render_node: None,
+            vulkan_driver: "lvp".into(),
+            wayland: None,
+            idle_grace: 0,
+            start_env: BTreeMap::new(),
+            broker_debug: None,
+            bridge_args: vec![],
+            bridge_env: BTreeMap::new(),
+            paths: Paths {
+                profile: profile.into(),
+                libexec: dir.clone(),
+                share: dir.clone(),
+                run: dir.clone(),
+                state: dir.clone(),
+                data_home: dir.clone(),
+                data: dir.clone(),
+                images: dir.clone(),
+                pin: dir.clone(),
+                root: dir.clone(),
+            },
+            image: Image {
+                name: String::new(),
+                dir: dir.clone(),
+                img: dir.clone(),
+                apexdir: dir.clone(),
+                derived: dir,
+            },
+        }
+    }
+
+    #[test]
+    fn only_the_test_switch_isolates_the_bridge() {
+        let mut c = config("default");
+        c.bridge_setup(false);
+        assert!(!c.bridge_args.iter().any(|a| a == "--test-session"));
+        let mut c = config("default");
+        c.bridge_setup(true);
+        assert!(c.bridge_args.iter().any(|a| a == "--test-session"));
     }
 }

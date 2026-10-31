@@ -17,9 +17,8 @@
 //! written by `innkeeper install` (which has more metadata, such as URL
 //! schemes) is never replaced; an entry for another session profile is never
 //! touched; an uninstall inside Android removes this profile's entry,
-//! whoever wrote it. Without `--mirror-apps` (only the main session passes
-//! it) every request succeeds and does nothing, so test sessions don't fill
-//! the user's app menu.
+//! whoever wrote it. In a test session every request succeeds and does
+//! nothing, so tests don't fill the user's app menu.
 
 use std::os::fd::OwnedFd;
 use std::sync::Arc;
@@ -182,7 +181,7 @@ pub fn parse_icons(b: &[u8]) -> Result<Vec<(u32, Vec<u8>)>, i32> {
 
 /// Settings shared by every connection.
 pub struct Config {
-    /// Off: every request is a no-op (other profiles' sessions, tests).
+    /// Off: every request is a no-op (test sessions).
     pub enabled: bool,
     pub mirror_apps: AtomicBool,
     pub dirs: xdg::Dirs,

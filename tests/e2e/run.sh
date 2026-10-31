@@ -12,7 +12,7 @@ trap 'report_error "$?" "$LINENO" "$BASH_COMMAND"' ERR
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(cd "$here/../.." && pwd)
 export INNKEEPER_PROFILE=${INNKEEPER_PROFILE:-e2e}
-export INNKEEPER_E2E=1
+export INNKEEPER_E2E=1 INNKEEPER_TEST=1
 S=$repo/tools/dev/session.sh
 T=$repo/out/test/e2e/$INNKEEPER_PROFILE
 desktop_log=$repo/out/test/nested/$INNKEEPER_PROFILE/desktop.log

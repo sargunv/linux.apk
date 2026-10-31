@@ -25,17 +25,18 @@ session in a sandbox of its own.
 | `lifecycle.rs`                      | stopping when idle, and the wakeup for the next alarm                                  |
 | `sys.rs`                            | syscall wrappers                                                                       |
 
-| Variable                                              | For                                                                                               |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `INNKEEPER_PROFILE`                                   | the profile to run (required); every profile is a test session, isolated from desktop integration |
-| `INNKEEPER_AUDIO_SOURCE`                              | users: Pulse/PipeWire capture source (default: desktop default)                                   |
-| `INNKEEPER_AUDIO_SINK`                                | users: one PipeWire sink for the session's audio                                                  |
-| `INNKEEPER_IDLE_GRACE`                                | users: seconds idle before the session stops (0: never)                                           |
-| `INNKEEPER_VULKAN=lvp`                                | debugging: software Vulkan (lavapipe) instead of a render node                                    |
-| `--headless`                                          | tests: no windows                                                                                 |
-| `INNKEEPER_TEST_TIMERS`                               | tests: short idle polling and alarm wake lead                                                     |
-| `INNKEEPER_DATA`, `INNKEEPER_IMAGES`, `INNKEEPER_PIN` | tests: Android's `/data`, the image cache, the pin                                                |
-| `INNKEEPER_BRIDGE_VERBOSE`, `INNKEEPER_BROKER_DEBUG`  | debugging: bridge stream stats; broker tracing                                                    |
+| Variable                                              | For                                                             |
+| ----------------------------------------------------- | --------------------------------------------------------------- |
+| `INNKEEPER_PROFILE`                                   | the profile to run (required)                                   |
+| `INNKEEPER_TEST=1`                                    | tests: a test session, isolated from desktop integration        |
+| `INNKEEPER_AUDIO_SOURCE`                              | users: Pulse/PipeWire capture source (default: desktop default) |
+| `INNKEEPER_AUDIO_SINK`                                | users: one PipeWire sink for the session's audio                |
+| `INNKEEPER_IDLE_GRACE`                                | users: seconds idle before the session stops (0: never)         |
+| `INNKEEPER_VULKAN=lvp`                                | debugging: software Vulkan (lavapipe) instead of a render node  |
+| `--headless`                                          | tests: no windows                                               |
+| `INNKEEPER_TEST_TIMERS`                               | tests: short idle polling and alarm wake lead                   |
+| `INNKEEPER_DATA`, `INNKEEPER_IMAGES`, `INNKEEPER_PIN` | tests: Android's `/data`, the image cache, the pin              |
+| `INNKEEPER_BRIDGE_VERBOSE`, `INNKEEPER_BROKER_DEBUG`  | debugging: bridge stream stats; broker tracing                  |
 
 Tests: `cargo test -p innkeeper-session` (in `mise run test`), and
 `mise run test:e2e -- boot`, which runs `selftest` in a fresh named profile.

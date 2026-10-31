@@ -39,10 +39,11 @@ what each directory is and where it runs.
   host's network, as any `--share=network` app does
   ([docs/security.md](docs/security.md#flatpak-mode)).
   `innkeeper-session selftest` must pass (`mise run test:e2e -- boot`).
-- **Test sessions are named.** Run anything with `INNKEEPER_PROFILE=<name>` and
-  a fresh data dir, and stop it when done. Don't start, restart or reset the
-  user's main session (no profile name), and don't install host integration
-  (`mise run install-dev`, desktop entries, MIME handlers) unless the user asks.
+- **Test sessions are named.** Run anything with `INNKEEPER_PROFILE=<name>`,
+  `INNKEEPER_TEST=1` and a fresh data dir, and stop it when done. Don't start,
+  restart or reset the user's own profiles (such as `default`), and don't
+  install host integration (`mise run install-dev`, desktop entries, MIME
+  handlers) unless the user asks.
 - **Test what you touched, in under a minute.** Keep only tests of observable
   behaviour we own. Unit and low-level tests cover branches, edge cases and
   error handling; e2e keeps one common-path scenario per user-visible feature,

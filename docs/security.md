@@ -150,7 +150,7 @@ available (KWin), or the display connection while an Innkeeper window has focus
 
 ## Test sessions
 
-A named `INNKEEPER_PROFILE` or `INNKEEPER_TEST=1` selects the bridge's
+`INNKEEPER_TEST=1`, which every test harness sets, selects the bridge's
 `--test-session` mode, persisted in `session.conf`. It leaves the user's desktop
 alone, including when tests use a private bus: links, notifications and MPRIS
 players are logged only, AT-SPI and location are off, and apps installed inside

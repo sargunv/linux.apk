@@ -3,7 +3,7 @@
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 session=$repo/tools/dev/session.sh
-export INNKEEPER_PROFILE=${INNKEEPER_PROFILE:-bionic}
+export INNKEEPER_PROFILE=${INNKEEPER_PROFILE:-bionic} INNKEEPER_TEST=1
 root=$repo/out/test/bionic/$INNKEEPER_PROFILE
 export INNKEEPER_DATA=${INNKEEPER_DATA:-$root/data}
 mkdir -p "$root"

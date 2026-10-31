@@ -39,10 +39,10 @@ available for a run.
 - **Session:** the named profile `INNKEEPER_PROFILE` (default `compat`) if it is
   running, or else one it starts (headless unless `--window`) and stops at the
   end. Only a session it starts gets its start time and idle memory measured: it
-  boots, restarts to time a cold start, and idles 90 s. A named profile is a
-  test session, so links are only logged. Run it at nice 0: uiautomator dies
-  when it can't reset its thread priority, so the harness re-runs itself at nice
-  0 when it finds itself niced.
+  boots, restarts to time a cold start, and idles 90 s. It runs as a test
+  session (`INNKEEPER_TEST=1`), so links are only logged. Run it at nice 0:
+  uiautomator dies when it can't reset its thread priority, so the harness
+  re-runs itself at nice 0 when it finds itself niced.
 - **Frameworks** in the corpus were identified by hand from each APK's libraries
   and assets (`libflutter.so`, `libhermes.so`, `assets/capacitor.config.json`,
   `libgodot_android.so`, Compose classes, `libgdx.so`, `libmaplibre.so`); there
