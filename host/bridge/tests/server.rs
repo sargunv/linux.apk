@@ -61,29 +61,13 @@ impl Service for Greet {
     }
 }
 
-/// Who may use the echo service, besides the allow-list.
-#[derive(Clone, Copy, PartialEq)]
-enum EchoAccess {
-    /// Everyone on the allow-list.
-    Open,
-    /// Our uid, though it isn't on the allow-list.
-    AlsoUs,
-    /// Nobody: it is private, and no uid is admitted to it.
-    Private,
-}
-
-fn start(limits: Limits, allow_self: bool) -> PathBuf {
-    start_with(limits, allow_self, EchoAccess::Open)
-}
-
-fn start_with(limits: Limits, allow_self: bool, echo: EchoAccess) -> PathBuf {
+fn start(limits: Limits) -> PathBuf {
     let path = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!(
         "bridge-{}-{}.sock",
         std::process::id(),
         N.fetch_add(1, Ordering::Relaxed)
     ));
     let l = transport::listen(&path).unwrap();
-    let me = rustix::process::getuid().as_raw();
     let mut services = Registry::default();
     let streams = Arc::new(AtomicUsize::new(0));
     services.register(service::AUDIO, "audio", move |peer, _events| {
@@ -97,22 +81,6 @@ fn start_with(limits: Limits, allow_self: bool, echo: EchoAccess) -> PathBuf {
     services.register(ECHO, "echo", |_peer, events| Ok(Box::new(Echo(events))));
     services.register(GREET, "greet", |_peer, events| Ok(Box::new(Greet(events))));
     let cfg = Config {
-        allow_uids: if allow_self {
-            vec![me]
-        } else {
-            vec![me.wrapping_add(1)]
-        },
-        service_uids: if echo == EchoAccess::AlsoUs {
-            let me2 = me;
-            vec![(ECHO, Arc::new(move |u| u == me2) as server::UidCheck)]
-        } else {
-            Vec::new()
-        },
-        private_services: if echo == EchoAccess::Private {
-            vec![ECHO]
-        } else {
-            Vec::new()
-        },
         max_clients: 4,
         services,
     };
@@ -232,7 +200,7 @@ fn wait_readable(fd: &OwnedFd, ms: i64) -> bool {
 
 #[test]
 fn stream_through_ring() {
-    let path = start(Limits::default(), true);
+    let path = start(Limits::default());
     let mut c = Client::connect(&path);
     c.hello();
     let (status, body, fds) = c.call(&out_cfg(480, 4)).unwrap();
@@ -331,7 +299,7 @@ fn stream_through_ring() {
 /// hang the stream thread, so closing the stream still answers.
 #[test]
 fn stream_fds_cannot_block_the_bridge() {
-    let path = start(Limits::default(), true);
+    let path = start(Limits::default());
     let mut c = Client::connect(&path);
     c.hello();
     let (status, body, fds) = c.call(&out_cfg(480, 4)).unwrap();
@@ -367,7 +335,7 @@ fn stream_fds_cannot_block_the_bridge() {
 
 #[test]
 fn protocol_errors() {
-    let path = start(Limits::default(), true);
+    let path = start(Limits::default());
     // Requests before HELLO are refused and the connection dropped.
     let mut c = Client::connect(&path);
     assert_eq!(c.call(&Request::Close { stream: 1 }).unwrap().0, -EPROTO);
@@ -448,7 +416,7 @@ fn resource_caps() {
         ring_bytes_per_client: 1 << 20,
         streams_total: 3,
     };
-    let path = start(limits, true);
+    let path = start(limits);
     let mut a = Client::connect(&path);
     a.hello();
     assert_eq!(a.call(&out_cfg(480, 2)).unwrap().0, 0);
@@ -473,44 +441,6 @@ fn resource_caps() {
 }
 
 #[test]
-fn refuses_unlisted_uid() {
-    let path = start(Limits::default(), false);
-    let mut c = Client::connect(&path);
-    assert!(c.call_with(|t| hello(1, 1).encode(t)).is_none());
-}
-
-#[test]
-fn service_only_uid() {
-    let path = start_with(Limits::default(), false, EchoAccess::AlsoUs);
-    let mut c = Client::connect(&path);
-    assert_eq!(
-        c.call_with(|t| hello(1, service::AUDIO).encode(t))
-            .unwrap()
-            .0,
-        -EACCES
-    );
-    let mut c = Client::connect(&path);
-    assert_eq!(c.call_with(|t| hello(1, ECHO).encode(t)).unwrap().0, 0);
-}
-
-#[test]
-fn private_service_refuses_the_allow_list() {
-    let path = start_with(Limits::default(), true, EchoAccess::Private);
-    let mut c = Client::connect(&path);
-    assert_eq!(
-        c.call_with(|t| hello(1, ECHO).encode(t)).unwrap().0,
-        -EACCES
-    );
-    let mut c = Client::connect(&path);
-    assert_eq!(
-        c.call_with(|t| hello(1, service::AUDIO).encode(t))
-            .unwrap()
-            .0,
-        0
-    );
-}
-
-#[test]
 fn listen_refuses_to_replace_files() {
     let p = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
         .join(format!("not-a-socket-{}", std::process::id()));
@@ -522,7 +452,7 @@ fn listen_refuses_to_replace_files() {
 
 #[test]
 fn service_events() {
-    let path = start(Limits::default(), true);
+    let path = start(Limits::default());
     let mut c = Client::connect(&path);
     assert_eq!(c.call_with(|t| hello(1, ECHO).encode(t)).unwrap().0, 0);
     c.send_raw(
@@ -555,7 +485,7 @@ fn service_events() {
 
 #[test]
 fn connected_events_follow_the_hello_reply() {
-    let path = start(Limits::default(), true);
+    let path = start(Limits::default());
     let mut c = Client::connect(&path);
     // call_with reads the next message as the reply: the greeting can't come first.
     assert_eq!(c.call_with(|t| hello(1, GREET).encode(t)).unwrap().0, 0);

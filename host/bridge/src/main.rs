@@ -1,5 +1,4 @@
-//! `innkeeper-bridge --run-dir DIR --state-dir DIR [--allow-uid UID]...
-//!                  [--system-app-dir DIR] [--test-session]
+//! `innkeeper-bridge --run-dir DIR --state-dir DIR [--test-session]
 //!                  [--sink NAME] [-v]`
 //!
 //! Listens on `<run-dir>/bridge/bridge.sock` (the launcher binds
@@ -8,11 +7,6 @@
 //! `<run-dir>/lifecycle` for the launcher. Document grants persist in
 //! `<state-dir>/documents.grants`.
 //!
-//! - `--allow-uid`: host uids that may connect (default: our own).
-//! - `--system-app-dir`: the Innkeeper System app's data directory as seen
-//!   from the host; its owner may use the system, documents, apps,
-//!   hoststate, input and a11y services. Nobody else may use input, a11y or
-//!   apps.
 //! - `--test-session` (also `INNKEEPER_TEST=1`): isolates the clipboard,
 //!   portals, OpenURI, notifications, MPRIS, AT-SPI and location from the
 //!   desktop, and gives apps installed inside Android no desktop entries.
@@ -29,16 +23,14 @@ use innkeeper_bridge::audio::{AudioService, Backend, Limits};
 use innkeeper_bridge::display::{DisplayService, Limits as DisplayLimits};
 use innkeeper_bridge::input::{Hub, InputService};
 use innkeeper_bridge::ipc::proto::service;
-use innkeeper_bridge::ipc::server::{self, Config, Registry, UidCheck};
+use innkeeper_bridge::ipc::server::{self, Config, Registry};
 use innkeeper_bridge::ipc::transport;
 use innkeeper_bridge::system::{Shared, SystemService};
 
 fn main() -> Result<()> {
     let mut run_dir: Option<PathBuf> = None;
     let mut state_dir: Option<PathBuf> = None;
-    let mut allow = Vec::new();
     let mut sink = None;
-    let mut system_app_dir: Option<PathBuf> = None;
     let mut test_session = std::env::var("INNKEEPER_TEST").is_ok_and(|v| v == "1");
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
@@ -47,17 +39,8 @@ fn main() -> Result<()> {
             "--state-dir" => {
                 state_dir = Some(args.next().context("--state-dir needs a path")?.into())
             }
-            "--allow-uid" => allow.push(
-                args.next()
-                    .context("--allow-uid needs a uid")?
-                    .parse()
-                    .context("bad uid")?,
-            ),
             "--sink" => sink = Some(args.next().context("--sink needs a name")?),
             "--test-session" => test_session = true,
-            "--system-app-dir" => {
-                system_app_dir = Some(args.next().context("--system-app-dir needs a path")?.into())
-            }
             "-v" | "--verbose" => innkeeper_bridge::log::set_verbose(true),
             _ => bail!("unknown argument {a:?} (see the source header for usage)"),
         }
@@ -68,9 +51,6 @@ fn main() -> Result<()> {
     let socket = run_dir.join("bridge/bridge.sock");
     // A report from before a restart is stale; the system app sends a new one.
     let _ = std::fs::remove_file(run_dir.join("lifecycle"));
-    if allow.is_empty() {
-        allow.push(rustix::process::getuid().as_raw());
-    }
     let backend = Backend::Pulse {
         sink,
         source: std::env::var("INNKEEPER_AUDIO_SOURCE").ok(),
@@ -189,37 +169,14 @@ fn main() -> Result<()> {
                 .with_session(session_api.clone(), events),
         ))
     });
-    let mut service_uids: Vec<(u32, UidCheck)> = Vec::new();
-    if let Some(dir) = system_app_dir {
-        // The system app's uid is assigned at install time; the owner of its
-        // data directory (created by installd) is the source of truth.
-        let check: UidCheck = Arc::new(move |uid| {
-            use std::os::unix::fs::MetadataExt;
-            std::fs::metadata(&dir).is_ok_and(|m| m.uid() == uid)
-        });
-        for id in [
-            service::SYSTEM,
-            service::DOCUMENTS,
-            service::APPS,
-            service::INPUT,
-            service::A11Y,
-            service::HOSTSTATE,
-        ] {
-            service_uids.push((id, check.clone()));
-        }
-    }
     let cfg = Config {
-        allow_uids: allow,
-        service_uids,
-        private_services: vec![service::INPUT, service::A11Y, service::APPS],
         max_clients: 32,
         services,
     };
     let listener = transport::listen(&socket)?;
     innkeeper_bridge::info!(
-        "listening on {} (uids {:?}, services {:?})",
+        "listening on {} (services {:?})",
         socket.display(),
-        cfg.allow_uids,
         cfg.services.names()
     );
     server::serve(listener, Arc::new(cfg))

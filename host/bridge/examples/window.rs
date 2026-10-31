@@ -5,9 +5,6 @@
 //! test pattern and prints the input service's events.
 //!
 //!   cargo run -p innkeeper-bridge --example window -- SOCKET [SECONDS]
-//!
-//! Only the system app may use the input service: run the bridge with
-//! `--system-app-dir` pointing at a directory you own.
 
 use std::io::IoSliceMut;
 use std::mem::MaybeUninit;

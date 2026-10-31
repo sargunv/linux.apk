@@ -31,7 +31,7 @@
   </privapp-permissions>
 
   <!-- Holders run with the "audio" group, which may enter the host bridge's socket directory
-       (/dev/socket/innkeeper, root:audio 0750). The bridge also checks the uid. -->
+       (/dev/socket/innkeeper, root:audio 0750). -->
   <permission name="dev.sargunv.innkeeper.permission.HOST_BRIDGE">
     <group gid="audio" />
   </permission>

@@ -48,14 +48,14 @@ fds (`SCM_RIGHTS`). Integers are little-endian.
 
 HELLO is the first message and binds the connection to one service; a client
 that needs two services opens two connections. A wrong major gets `-EPROTO`, an
-unknown service `-ENOSYS`, a service the peer isn't admitted to `-EACCES`, and
-any other first message `-EPROTO`; each closes the connection.
+unknown service `-ENOSYS`, and any other first message `-EPROTO`; each closes
+the connection.
 
 ```mermaid
 sequenceDiagram
   participant C as Android client
   participant B as bridge
-  C->>B: connect (SO_PEERCRED checked against the allow-list)
+  C->>B: connect (SO_PEERCRED: the host user)
   C->>B: HELLO service=N
   B-->>C: reply 0 (major, minor)
   C->>B: request (tag t)
@@ -149,8 +149,7 @@ ignore reply bytes they don't know. A new major version means a new HELLO.
    don't expect, and check the ones you do (`fstat`, seals, size) before mapping
    them. Put per-client caps in the service.
 4. Send events with `server::Events::try_send`, which never blocks.
-5. Register the factory in `main.rs`, and extend the launcher's `--allow-uid`
-   list if the service has new clients.
+5. Register the factory in `main.rs`.
 6. Shared memory you hand out is created and sealed by the bridge; never read
    back state you own from it, and clamp what the client writes there.
 
@@ -206,8 +205,7 @@ request `0x0504`, the same envelope and one sealed response memfd. No trailing
 envelope bytes or extra fds are accepted. Both JSON payloads are capped at 64
 KiB. Up to eight requests may wait; the system app serializes operations on its
 apps worker. A reconnect cancels pending requests and stale responses are
-ignored. The apps service, like input and accessibility, only admits the system
-app's uid.
+ignored.
 
 Escape-as-Back is stored per package in the system app's device-protected
 preferences, default off. Input resolves the `innkeeper:<package>` display on

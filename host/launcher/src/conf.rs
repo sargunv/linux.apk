@@ -10,7 +10,6 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::paths::{Image, Paths};
-use crate::sys;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -90,26 +89,15 @@ impl Config {
     }
 
     /// The desktop bridge's arguments and environment
-    /// (host/bridge/README.md). It runs outside Android, as the user. Its
-    /// socket dir is Android's `/dev/socket/innkeeper`, and it only accepts
-    /// Android root, system and audioserver (SO_PEERCRED, as host ids), plus
-    /// the system app's uid (the owner of its data dir).
+    /// (host/bridge/README.md). It runs outside Android, as the user, and its
+    /// socket dir is Android's `/dev/socket/innkeeper`.
     fn bridge_setup(&mut self, test: bool) {
         let p = &self.paths;
         let a = &mut self.bridge_args;
-        for (k, v) in [
-            ("--run-dir", p.run.clone()),
-            ("--state-dir", p.state.clone()),
-            (
-                "--system-app-dir",
-                p.data.join("data/dev.sargunv.innkeeper.system"),
-            ),
-        ] {
+        for (k, v) in [("--run-dir", &p.run), ("--state-dir", &p.state)] {
             a.push(k.into());
             a.push(v.to_string_lossy().into_owned());
         }
-        a.push("--allow-uid".into());
-        a.push(sys::uid().to_string());
         if let Some(sink) = env::var("INNKEEPER_AUDIO_SINK")
             .ok()
             .filter(|v| !v.is_empty())

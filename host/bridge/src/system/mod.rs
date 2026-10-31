@@ -14,10 +14,6 @@
 //! - lifecycle: what keeps the session up, written to `<run-dir>/lifecycle`
 //!   for the launcher's idle shutdown (docs/session.md, "Lifecycle"), and
 //!   the indicator for apps running in the background
-//!
-//! Only the system app's uid (and the static allow-list, which holds
-//! Android root for tests) may open it: `main.rs` resolves that uid from the
-//! owner of the app's data directory at connect time.
 
 pub mod clipboard;
 pub mod handoff;
