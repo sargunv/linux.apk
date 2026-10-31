@@ -58,6 +58,11 @@ until_ok() {
 booted() { [[ $(s getprop sys.boot_completed 2>/dev/null) == 1 ]]; }
 user_unlocked() { [[ $(s am get-started-user-state 0 2>/dev/null) == RUNNING_UNLOCKED ]]; }
 log_has() { s logcat -d -s "$1:I" | grep -E "$2" >/dev/null; }
+# dev.sargunv.Innkeeper.TestDesktop: mutter.js on GNOME Shell, kwin.py on KWin.
+desktop() {
+  gdbus call --session --dest dev.sargunv.Innkeeper.TestDesktop --object-path /dev/sargunv/Innkeeper/TestDesktop \
+    --method "dev.sargunv.Innkeeper.TestDesktop.$1" "${@:2}"
+}
 file_has() { grep -E "$2" "$1" >/dev/null; }
 window_ready() { s dumpsys activity activities | grep "topResumedActivity=.*$1" >/dev/null; }
 launch() {
@@ -191,34 +196,11 @@ if [[ ${1:-} == --group ]]; then
       until_ok mapped
       # Position the window for absolute input without resizing Android's
       # display: resize snapshots temporarily block otherwise valid touches.
-      if [[ ${INNKEEPER_TEST_COMPOSITOR:-kwin} == mutter ]]; then
-        # HWC's first frame can precede Mutter creating its window actor.
-        # Retry the compositor operation until it actually found the window.
-        # shellcheck disable=SC2329 # invoked through until_ok
-        positioned() {
-          gdbus call --session --dest dev.sargunv.Innkeeper.TestDesktop --object-path /dev/sargunv/Innkeeper/TestDesktop \
-            --method dev.sargunv.Innkeeper.TestDesktop.Position | grep -q true
-        }
-        until_ok positioned
-      else
-        cat >"$T/input-window.js" <<'JS'
-for (const w of workspace.windowList()) {
-  if (String(w.resourceClass).includes("dev.sargunv.innkeeper.probes")) {
-    const geometry = w.frameGeometry;
-    geometry.x = 300;
-    geometry.y = 100;
-    w.frameGeometry = geometry;
-    workspace.activeWindow = w;
-  }
-}
-JS
-        script_id=$(gdbus call --session --dest org.kde.KWin --object-path /Scripting \
-          --method org.kde.kwin.Scripting.loadScript "$T/input-window.js" innkeeper-input-window | grep -oE '[0-9]+')
-        gdbus call --session --dest org.kde.KWin --object-path "/Scripting/Script$script_id" \
-          --method org.kde.kwin.Script.run >/dev/null
-        gdbus call --session --dest org.kde.KWin --object-path /Scripting \
-          --method org.kde.kwin.Scripting.unloadScript innkeeper-input-window >/dev/null
-      fi
+      # HWC's first frame can precede the compositor's window for it: retry
+      # until the compositor actually found the window.
+      # shellcheck disable=SC2329 # invoked through until_ok
+      positioned() { desktop Position | grep -q true; }
+      until_ok positioned
       # Activity resume precedes InputDispatcher's focused-window publication.
       # Wait for the actual input target before submitting the burst.
       # shellcheck disable=SC2329 # invoked through until_ok
@@ -328,12 +310,7 @@ if (
       # A host screenshot checks the displayed pixels, not just Android's buffer.
       # shellcheck disable=SC2329 # invoked through until_ok
       wide_colour_visible() {
-        if [[ ${INNKEEPER_TEST_COMPOSITOR:-kwin} == mutter ]]; then
-          gdbus call --session --dest dev.sargunv.Innkeeper.TestDesktop --object-path /dev/sargunv/Innkeeper/TestDesktop \
-            --method dev.sargunv.Innkeeper.TestDesktop.Screenshot "$T/wide-colour.png" >/dev/null || return 1
-        else
-          spectacle -b -n -a -o "$T/wide-colour.png" >/dev/null 2>&1 || return 1
-        fi
+        desktop Screenshot "$T/wide-colour.png" >/dev/null || return 1
         /usr/bin/python3 "$repo/tests/e2e/wide_colour.py" "$T/wide-colour.png"
       }
       until_ok wide_colour_visible

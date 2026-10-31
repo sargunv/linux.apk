@@ -162,11 +162,13 @@ env "${D[@]}" out/stage/bin/innkeeper install some.apk
   `HOME`, nested `WAYLAND_DISPLAY`) before testing. Never start plasmashell,
   kded, akonadi or kdeconnect against the real dirs, and stop every unit you
   started when done.
-- KWin's `org_kde_kwin_fake_input` gives real seat input. KWin offers it only to
-  a client whose resolved executable (e.g. `/usr/bin/python3.14`, not the
-  symlink) is the `Exec` of a `.desktop` file in `$N/data/applications` with
-  `X-KDE-Wayland-Interfaces=org_kde_kwin_fake_input`. `spectacle -b -n` with the
-  nested bus captures screenshots.
+- `tests/nested.sh` serves `dev.sargunv.Innkeeper.TestDesktop` (input, window
+  visibility and position, screenshots) on both compositors: `tests/e2e/kwin.py`
+  on KWin, `tests/e2e/mutter.js` on GNOME Shell. KWin's
+  `org_kde_kwin_fake_input` and `org.kde.KWin.ScreenShot2` are offered only to a
+  client whose resolved executable (e.g. `/usr/bin/python3.14`, not the symlink)
+  is the `Exec` of a `.desktop` file in `$N/data/applications` that names them
+  in `X-KDE-Wayland-Interfaces` and `X-KDE-DBUS-Restricted-Interfaces`.
 - Inside Android, plain `screencap` shows only the launcher: each app window is
   its own virtual display, named `innkeeper:<package>`. Capture one with
   `screencap -d <id> -p <file>`, taking the id from

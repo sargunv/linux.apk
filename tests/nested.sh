@@ -63,8 +63,9 @@ trap cleanup EXIT
 trap 'exit 130' INT TERM
 mkdir -p "$N"/{home,config,data,cache,state}
 : >"$N/compositor.log"
-# KWin grants fake seat input only to an executable whose desktop file names
-# the protocol. This entry lives solely on this disposable desktop.
+# KWin grants fake seat input and screenshots only to an executable whose
+# desktop file names them: tests/e2e/kwin.py. This entry lives solely on this
+# disposable desktop.
 mkdir -p "$N/data/applications"
 cat >"$N/data/applications/dev.sargunv.Innkeeper.TestSeat.desktop" <<DESKTOP
 [Desktop Entry]
@@ -73,6 +74,7 @@ Name=Innkeeper test seat
 Exec=$(readlink -f /usr/bin/python3)
 NoDisplay=true
 X-KDE-Wayland-Interfaces=org_kde_kwin_fake_input
+X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2
 DESKTOP
 
 if [[ -n ${INNKEEPER_TEST_LAUNCHER_PORTAL:-} ]]; then
@@ -83,7 +85,7 @@ fi
 cat >"$N/hold.sh" <<HOLD
 #!/bin/sh
 echo "\$DBUS_SESSION_BUS_ADDRESS" >"$N/bus"
-exec sleep infinity
+exec /usr/bin/python3 "$repo/tests/e2e/kwin.py" "$N"
 HOLD
 chmod +x "$N/hold.sh"
 # Explicit daemon config avoids system fragments (including network devices).
@@ -182,14 +184,8 @@ DBUS_SESSION_BUS_ADDRESS=$(cat "$N/bus")
 private_bus=$DBUS_SESSION_BUS_ADDRESS
 export XDG_RUNTIME_DIR=$rt WAYLAND_DISPLAY=inkp-nested DBUS_SESSION_BUS_ADDRESS
 export INNKEEPER_NESTED=1
-if [[ $INNKEEPER_TEST_COMPOSITOR == mutter ]]; then
-  phase='waiting for Mutter automation service dev.sargunv.Innkeeper.TestDesktop'
-  gdbus wait --session --timeout 10 dev.sargunv.Innkeeper.TestDesktop
-else
-  phase='reading KWin support information'
-  gdbus call --session --dest org.kde.KWin --object-path /KWin \
-    --method org.kde.KWin.supportInformation >"$N/kwin-support.txt"
-fi
+phase='waiting for the test desktop service dev.sargunv.Innkeeper.TestDesktop'
+gdbus wait --session --timeout 10 dev.sargunv.Innkeeper.TestDesktop
 phase='waiting for private audio server'
 for _ in $(seq 100); do
   if pactl info >/dev/null 2>&1; then break; fi
