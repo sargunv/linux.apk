@@ -146,7 +146,7 @@ python3 -B -m unittest discover -s tests/e2e -p 'test_*.py'
 """
 
 [tasks."test:bionic"]
-description = "Android binaries in the Flatpak session (INNKEEPER_BIONIC_HARNESS=1: bootless HAL harness)"
+description = "Android test binaries against our HALs in a fresh named session"
 run = """
 set -euo pipefail
 v=out/build/android/android/vendor/graphics/test-vendor

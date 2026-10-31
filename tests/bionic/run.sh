@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
-# Run on-device test binaries in the same Flatpak session as the boot suites.
+# Run Android x86_64 test binaries against our vendor HALs and drivers in a
+# fresh named Flatpak session.
+#
+#   tests/bionic/run.sh [-e VAR=val]... [-v VENDOR_DIR]... [-t TEST_DIR] -- PROG [ARGS...]
+#
+# -v layers VENDOR_DIR over /vendor through a session addon (first on top),
+# -t copies TEST_DIR to /data/nativetest64, and -e passes VAR=val to PROG.
+# INNKEEPER_PROPS="name=value;..." sets those properties; read-only ones are
+# per-process, through the props shim (props-shim.c) preloaded into PROG.
+# TIMEOUT=<s> (default 300) bounds PROG. The composer's frame dumps land in
+# out/test/bionic/<profile>/frames.
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 session=$repo/tools/dev/session.sh
@@ -61,8 +71,8 @@ done
   echo 'session failed to boot' >&2
   exit 1
 }
-# HAL clients need exclusive access to the composer, as in the bootless host
-# runner. Keep init/logd/properties and the HALs, but stop framework clients.
+# HAL clients need exclusive access to the composer. Keep init, logd,
+# properties and the HALs, but stop framework clients.
 "$session" exec stop
 for _ in $(seq 100); do
   if ! "$session" exec pidof surfaceflinger >/dev/null; then break; fi
@@ -72,7 +82,6 @@ if [[ -n $testdir ]]; then
   "$session" exec mkdir -p /data/nativetest64
   tar -C "$testdir" -cf - . | "$session" exec tar -xf - -C /data/nativetest64
 fi
-# The live property service replaces props-shim in the no-init host harness.
 args=()
 for e in "${envs[@]}"; do
   if [[ $e == INNKEEPER_PROPS=* ]]; then
@@ -82,7 +91,7 @@ for e in "${envs[@]}"; do
     done
     # Read-only test properties must be per-process; init has already seeded
     # the real property area. Preload from a path permitted by this test's
-    # vendor or platform linker namespace. Host mode uses the same shim.
+    # vendor or platform linker namespace.
     args+=("$e")
     if [[ $1 == /vendor/* || $1 == /odm/* ]]; then
       args+=(LD_PRELOAD=/vendor/lib64/libinnkeeper_test_props.so)

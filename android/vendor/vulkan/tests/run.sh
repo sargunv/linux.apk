@@ -37,7 +37,7 @@ driver_tests() {
 # Ask a normal session, so the hardware test uses exactly the node and HAL
 # selected by the launcher and permitted by its broker (also on hybrid hosts).
 # shellcheck disable=SC2016 # getprop runs inside Android
-selected=$(INNKEEPER_BIONIC_HARNESS=0 "$repo/tests/bionic/run.sh" -- /system/bin/sh -c \
+selected=$("$repo/tests/bionic/run.sh" -- /system/bin/sh -c \
   'echo "innkeeper-selected-driver=$(getprop ro.hardware.vulkan)"' |
   sed -n 's/^innkeeper-selected-driver=//p')
 drivers=(lvp)
