@@ -167,15 +167,11 @@ impl SessionRow {
                 self.button.set_label("Start");
             }
             Some(s) => {
-                let mem = s
-                    .memory
-                    .map(|m| format!(" · {} in use", glib::format_size(m)))
-                    .unwrap_or_default();
                 if s.booted {
-                    self.row.set_subtitle(&format!("Running{mem}"));
+                    self.row.set_subtitle("Running");
                     self.dot.add_css_class("running");
                 } else {
-                    self.row.set_subtitle(&format!("Starting{mem}"));
+                    self.row.set_subtitle("Starting");
                     self.dot.add_css_class("starting");
                 }
                 self.button.set_label("Stop");
@@ -824,11 +820,7 @@ impl Window {
             }
             let (booted, packages) = state.unwrap_or_default();
             *w.open_apps.borrow_mut() = packages.into_iter().collect();
-            let st = Status {
-                running,
-                booted,
-                memory: None,
-            };
+            let st = Status { running, booted };
             let was_booted = w.last_status.replace(Some(st)).is_some_and(|s| s.booted);
             if !w.session_busy.get() {
                 w.show_session(Some(st), None);

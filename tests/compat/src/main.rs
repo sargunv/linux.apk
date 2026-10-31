@@ -240,7 +240,7 @@ fn real_main() -> Result<ExitCode> {
         date: today(),
         build: s.getprop("ro.build.fingerprint"),
         headless: s.headless(),
-        session_mem_mb: s.status().memory.map(|b| b >> 20),
+        session_mem_mb: s.memory_current().map(|b| b >> 20),
         measured,
         apps: results.clone(),
     };

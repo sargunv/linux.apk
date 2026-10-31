@@ -167,18 +167,30 @@ impl Session {
         Ok(t.elapsed())
     }
 
+    /// The dev driver's Flatpak scope.
+    fn cgroup(&self) -> Option<PathBuf> {
+        let o = Command::new(&self.driver).arg("cgroup").output().ok()?;
+        o.status
+            .success()
+            .then(|| String::from_utf8_lossy(&o.stdout).trim().into())
+    }
+
+    /// The session scope's memory use (`memory.current`), in bytes.
+    pub fn memory_current(&self) -> Option<u64> {
+        fs::read_to_string(self.cgroup()?.join("memory.current"))
+            .ok()?
+            .trim()
+            .parse()
+            .ok()
+    }
+
     /// The session cgroup's memory without page cache (`memory.current`
     /// less the file pages that aren't shmem), in MiB. Page cache is charged
     /// to whichever cgroup read a file first, so it depends on what else has
     /// read the image.
     pub fn memory_without_cache(&self) -> Option<u64> {
-        let cg = self.cgroup()?;
-        let current: u64 = fs::read_to_string(cg.join("memory.current"))
-            .ok()?
-            .trim()
-            .parse()
-            .ok()?;
-        let stat = fs::read_to_string(cg.join("memory.stat")).ok()?;
+        let current = self.memory_current()?;
+        let stat = fs::read_to_string(self.cgroup()?.join("memory.stat")).ok()?;
         let field = |k: &str| {
             stat.lines()
                 .find_map(|l| l.strip_prefix(k)?.strip_prefix(' ')?.parse::<u64>().ok())

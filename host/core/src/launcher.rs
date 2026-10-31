@@ -1,8 +1,7 @@
 //! Driving the Android session through `innkeeper-session` (the prefix's, or
-//! any launcher for test harnesses). Its state (running, memory,
-//! the image) comes from the launcher's library, or, for a launcher outside a
-//! prefix (the dev driver, tools/dev/session.sh), from its `status`, `cgroup`
-//! and `image`; starting, stopping and commands go through the launcher
+//! any launcher for test harnesses). Its state (running, the image) comes
+//! from the launcher's library, or, for a launcher outside a prefix (the dev
+//! driver, tools/dev/session.sh), from its `status` and `image`; starting, stopping and commands go through the launcher
 //! itself. Commands run inside the session
 //! as argv through `innkeeper-session exec`, which hands them to the exec
 //! relay as argv: no string is ever interpreted by a shell, host or Android.
@@ -39,8 +38,6 @@ fn clean_stderr(s: &str) -> String {
 pub struct Status {
     pub running: bool,
     pub booted: bool,
-    /// The session unit's memory use (cgroup `memory.current`), in bytes.
-    pub memory: Option<u64>,
 }
 
 impl Session {
@@ -108,14 +105,6 @@ impl Session {
         o.status
             .success()
             .then(|| String::from_utf8_lossy(&o.stdout).into_owned())
-    }
-
-    /// The dev driver's Flatpak scope, for memory accounting.
-    pub fn cgroup(&self) -> Option<PathBuf> {
-        match self.paths() {
-            Some(_) => None,
-            None => Some(self.query("cgroup")?.trim().into()),
-        }
     }
 
     /// Runs argv inside the session as root; returns (success, stdout, stderr).
@@ -187,8 +176,7 @@ impl Session {
         Ok(())
     }
 
-    /// Running state, boot state and memory use, for status
-    /// displays.
+    /// Running and boot state, for status displays.
     pub fn status(&self) -> Status {
         let Some(s) = self.state() else {
             return Status::default();
@@ -199,13 +187,6 @@ impl Session {
         Status {
             running: true,
             booted: self.booted(),
-            memory: self.cgroup().and_then(|cg| {
-                std::fs::read_to_string(cg.join("memory.current"))
-                    .ok()?
-                    .trim()
-                    .parse()
-                    .ok()
-            }),
         }
     }
 
