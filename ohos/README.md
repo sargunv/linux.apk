@@ -1,15 +1,16 @@
 # ohos
 
-An OpenHarmony userspace as a second guest, on the same supervisor as Android
-(feasibility and milestones: #191). The pinned image
-([image/ohos](../image/ohos/README.md)) boots in a test Flatpak sandbox on the
-host kernel: OH's init starts its services, samgr comes up and OH's core system
-abilities register with it. render_service composes OH's screen through our
-display HDI ([vendor/display](vendor/display/README.md)), and with the bridge it
-shows in a desktop window. SceneBoard, OH's window manager and home screen,
-starts and draws the lock screen; built-in apps such as Settings run in it.
-There is no desktop input or app install yet. Nothing here is part of the
-Android session, `mise run build` or the stage.
+An experimental OpenHarmony userspace as a second guest, on the same supervisor
+as Android (feasibility and milestones: #191). It runs only from a source
+checkout: no profile can pick it yet, so the shipped app says Android only. The
+pinned image ([image/ohos](../image/ohos/README.md)) boots in a test Flatpak
+sandbox on the host kernel: OH's init starts its services, samgr comes up and
+OH's core system abilities register with it. render_service composes OH's screen
+through our display HDI ([vendor/display](vendor/display/README.md)), and with
+the bridge it shows in a desktop window. SceneBoard, OH's window manager and
+home screen, starts and draws the lock screen; built-in apps such as Settings
+run in it. There is no desktop input or app install yet. Nothing here is part of
+the Android session, `mise run build` or the stage.
 
 | File                      | What                                                          |
 | ------------------------- | ------------------------------------------------------------- |

@@ -116,7 +116,7 @@ fn about_dialog(w: &Window) {
         .application_icon(MANAGER_ID)
         .developer_name("Innkeeper contributors")
         .version(env!("CARGO_PKG_VERSION"))
-        .comments("Run Android and OpenHarmony apps on Linux")
+        .comments("Run Android apps on Linux")
         .website("https://github.com/sargunv/innkeeper")
         .issue_url("https://github.com/sargunv/innkeeper/issues")
         .license_type(gtk::License::Agpl30)

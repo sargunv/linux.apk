@@ -21,11 +21,7 @@ mod splash;
 use splash::Splash;
 
 #[derive(Parser)]
-#[command(
-    name = "innkeeper",
-    version,
-    about = "Run Android and OpenHarmony apps on Linux"
-)]
+#[command(name = "innkeeper", version, about = "Run Android apps on Linux")]
 struct Cli {
     /// The profile to work with (`default`, or a name from `profile list`).
     #[arg(long, global = true, value_name = "NAME")]

@@ -4,10 +4,10 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>AGPL-3.0-or-later</project_license>
   <name>Innkeeper</name>
-  <summary>Run Android and OpenHarmony apps on Linux</summary>
+  <summary>Run Android apps on Linux</summary>
   <description>
     <p>
-      Innkeeper runs Android and OpenHarmony apps on Linux: each app gets its own window,
+      Innkeeper runs Android apps on Linux: each app gets its own window,
       app-menu entry and icon, with sound, clipboard, notifications and file
       access through the desktop. Android itself runs rootless, in a sandboxed
       session of its own.
