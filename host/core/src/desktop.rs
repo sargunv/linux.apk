@@ -19,24 +19,17 @@ pub const MANAGER_ID: &str = "dev.sargunv.Innkeeper";
 /// The manager's icon (also used where an app has no icon of its own).
 pub const MANAGER_ICON_SVG: &str = include_str!("../../manager/data/dev.sargunv.Innkeeper.svg");
 
-/// Innkeeper's Flatpak app id when it runs inside its Flatpak (where app-menu
-/// entries go through the DynamicLauncher portal), else None.
-pub fn flatpak_app_id() -> Option<String> {
-    std::path::Path::new("/.flatpak-info")
-        .exists()
-        .then(|| std::env::var("FLATPAK_ID").unwrap_or_else(|_| MANAGER_ID.into()))
+/// Innkeeper's Flatpak app id (the dev build's differs from the release's).
+pub fn flatpak_app_id() -> String {
+    std::env::var("FLATPAK_ID").unwrap_or_else(|_| MANAGER_ID.into())
 }
 
 /// The id desktops match an app's windows (`app_id`, `StartupWMClass`),
-/// notifications and MPRIS players to its menu entry by:
-/// `dev.sargunv.innkeeper.<pkg>`, or inside the Flatpak `<app id>.<pkg>`, the id the
-/// portal gives the entry and the only prefix a compositor lets a sandboxed
-/// client's windows claim.
+/// notifications and MPRIS players to its menu entry by: `<app id>.<pkg>`,
+/// the id the portal gives the entry and the only prefix a compositor lets a
+/// sandboxed client's windows claim.
 pub fn app_id(pkg: &str) -> String {
-    match flatpak_app_id() {
-        Some(id) => format!("{id}.{pkg}"),
-        None => format!("{PREFIX}{pkg}"),
-    }
+    format!("{}.{pkg}", flatpak_app_id())
 }
 
 /// [`app_id`] for an id Android sent (`dev.sargunv.innkeeper.<pkg>`, the system
@@ -402,7 +395,7 @@ mod tests {
                 ("de".into(), "Wikipedia DE".into()),
                 ("pt_BR".into(), "Wikipédia".into()),
             ],
-            run: vec!["/opt/linux apk/bin/innkeeper".into(), "run".into()],
+            run: vec!["innkeeper".into(), "run".into()],
             icon: Some("dev.sargunv.innkeeper.org.wikipedia".into()),
             version: "2.7.50".into(),
             categories: vec!["Utility".into()],
@@ -426,8 +419,8 @@ mod tests {
             "[Desktop Entry]\nType=Application\nVersion=1.5\nName=Wikipedia\n\
              Name[de]=Wikipedia DE\nName[pt_BR]=Wikipédia\nComment=Android app (org.wikipedia)\n\
              Icon=dev.sargunv.innkeeper.org.wikipedia\n\
-             Exec=\"/opt/linux apk/bin/innkeeper\" run org.wikipedia %U\nTerminal=false\n\
-             StartupNotify=true\nStartupWMClass=dev.sargunv.innkeeper.org.wikipedia\nCategories=Utility;\n\
+             Exec=innkeeper run org.wikipedia %U\nTerminal=false\n\
+             StartupNotify=true\nStartupWMClass=dev.sargunv.Innkeeper.org.wikipedia\nCategories=Utility;\n\
              MimeType=x-scheme-handler/wikipedia;\nKeywords=Android;\n\
              X-Innkeeper-Package=org.wikipedia\nX-Innkeeper-Version=2.7.50\n\
              X-Innkeeper-Web-Hosts=*.wikipedia.org;\nX-Innkeeper-Splash=#f8f9fa\n\
@@ -454,12 +447,12 @@ mod tests {
         e.run = vec![
             "env".into(),
             "INNKEEPER_PROFILE=test".into(),
-            "/opt/linux apk/bin/innkeeper".into(),
+            "innkeeper".into(),
             "run".into(),
         ];
         let text = e.render().unwrap();
         assert!(text.contains("Actions=NewWindow;\n"));
-        assert!(text.ends_with("[Desktop Action NewWindow]\nName=New Window\nExec=env INNKEEPER_PROFILE=test \"/opt/linux apk/bin/innkeeper\" run --new-window org.wikipedia\n"));
+        assert!(text.ends_with("[Desktop Action NewWindow]\nName=New Window\nExec=env INNKEEPER_PROFILE=test innkeeper run --new-window org.wikipedia\n"));
     }
 
     #[test]

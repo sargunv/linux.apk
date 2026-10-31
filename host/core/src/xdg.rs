@@ -1,19 +1,16 @@
-//! Host desktop integration: app desktop entries, their hicolor icons, and the
-//! desktop database. Inside the Flatpak the entries in `applications` are the
-//! app's own record (in its private data dir); the app menu gets them through
-//! the DynamicLauncher portal ([`crate::dynlauncher`]).
+//! Host desktop integration: app desktop entries and their hicolor icons. The
+//! entries in `applications` are the app's own record (in the Flatpak's
+//! private data dir); the app menu gets them through the DynamicLauncher
+//! portal ([`crate::dynlauncher`]).
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::Duration;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 
 use crate::desktop::{self, AppEntry, MANAGER_ICON_SVG, PREFIX};
 use crate::dynlauncher::{self, Answer};
 use crate::paths::{self, xdg_home};
-use crate::proc;
 
 /// Sizes we render icons at; all are hicolor theme directories.
 pub const ICON_SIZES: &[u32] = &[48, 64, 128, 256, 512];
@@ -24,8 +21,8 @@ pub struct Dirs {
     pub data: PathBuf,
     pub config: PathBuf,
     pub cache: PathBuf,
-    /// The app menu is reached through the DynamicLauncher portal (inside the
-    /// Flatpak), as `<app id>.<pkg>.desktop`.
+    /// The app id whose DynamicLauncher portal entries make the app menu, as
+    /// `<app id>.<pkg>.desktop`. None only in tests: records without a menu.
     pub portal: Option<String>,
 }
 
@@ -39,7 +36,7 @@ impl Dirs {
             data: xdg_home("XDG_DATA_HOME", ".local/share"),
             config: xdg_home("XDG_CONFIG_HOME", ".config"),
             cache: xdg_home("XDG_CACHE_HOME", ".cache").join("innkeeper"),
-            portal: desktop::flatpak_app_id(),
+            portal: Some(desktop::flatpak_app_id()),
         }
     }
 
@@ -78,41 +75,6 @@ pub fn write_atomic(path: &Path, data: &[u8]) -> Result<()> {
     fs::rename(&tmp, path).with_context(|| format!("write {}", path.display()))
 }
 
-/// Runs a desktop helper tool if it's installed; failures are warnings.
-fn tool(name: &str, args: &[&std::ffi::OsStr]) {
-    if proc::which(name).is_none() {
-        return;
-    }
-    match proc::run(
-        Command::new(name).args(args),
-        Stdio::null(),
-        Duration::from_secs(60),
-    ) {
-        Ok(o) if o.ok() => {}
-        Ok(o) => eprintln!("innkeeper: {name}: {}", o.stderr.trim()),
-        Err(e) => eprintln!("innkeeper: {name}: {e}"),
-    }
-}
-
-pub fn update_desktop_database(d: &Dirs) {
-    if d.portal.is_some() {
-        return;
-    }
-    tool("update-desktop-database", &[d.applications().as_os_str()]);
-}
-
-fn update_icon_cache(d: &Dirs) {
-    let h = d.hicolor();
-    // Only if a cache already exists: a stale one hides new icons, but we don't
-    // create one where the desktop doesn't use it.
-    if d.portal.is_none() && h.join("icon-theme.cache").is_file() {
-        tool(
-            "gtk-update-icon-cache",
-            &["-q".as_ref(), "-f".as_ref(), "-t".as_ref(), h.as_os_str()],
-        );
-    }
-}
-
 /// Removes every hicolor PNG named `<id>.png` (all sizes). Returns how many.
 fn remove_icons(d: &Dirs, id: &str) -> usize {
     let mut n = 0;
@@ -140,29 +102,35 @@ pub fn png_size(png: &[u8]) -> Option<(u32, u32)> {
 /// Where an app's menu entry went.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Menu {
-    /// A desktop file in the user's `applications` dir.
-    File(PathBuf),
     /// Added through the DynamicLauncher portal, as this id.
     Portal(String),
     /// The user declined the portal's dialog.
     Declined,
+    /// No app menu ([`Dirs::portal`] is None).
+    None,
 }
 
 impl std::fmt::Display for Menu {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Menu::File(p) => write!(f, "{}", p.display()),
             Menu::Portal(id) => write!(f, "{id} (through the desktop portal)"),
             Menu::Declined => write!(f, "none (declined)"),
+            Menu::None => write!(f, "none"),
         }
     }
 }
 
-/// Installs an app's icons and desktop entry, replacing any previous ones.
-/// `icons` are (size, PNG); sizes that aren't hicolor directories are skipped.
-/// Inside the Flatpak the entry is the app's record, and the user is asked to
-/// add it to the app menu unless the menu already runs it.
+/// Installs an app's record and asks the user to add it to the app menu
+/// unless the menu already runs it.
 pub fn install_app(d: &Dirs, entry: &mut AppEntry, icons: &[(u32, Vec<u8>)]) -> Result<Menu> {
+    let text = write_record(d, entry, icons)?;
+    add_to_menu(d, &entry.package, &text, false)
+}
+
+/// Writes an app's record and icons, replacing any previous ones, and
+/// returns the record. `icons` are (size, PNG); sizes that aren't hicolor
+/// directories are skipped.
+pub fn write_record(d: &Dirs, entry: &mut AppEntry, icons: &[(u32, Vec<u8>)]) -> Result<String> {
     let id = entry.id();
     remove_icons(d, &id);
     let mut wrote = false;
@@ -177,23 +145,17 @@ pub fn install_app(d: &Dirs, entry: &mut AppEntry, icons: &[(u32, Vec<u8>)]) -> 
     } else {
         "android-package-archive".into()
     });
-    let path = d.app_desktop(&entry.package);
     let text = entry.render()?;
-    write_atomic(&path, text.as_bytes())?;
-    if d.portal.is_some() {
-        return add_to_menu(d, &entry.package, &text, false);
-    }
-    update_icon_cache(d);
-    update_desktop_database(d);
-    Ok(Menu::File(path))
+    write_atomic(&d.app_desktop(&entry.package), text.as_bytes())?;
+    Ok(text)
 }
 
 /// The portal's entry for record `text` of `pkg`: unless the app menu
 /// already has one that runs the record's command, asks the user to add it.
 /// With `repair`, a record whose entry the user declined is left alone.
-fn add_to_menu(d: &Dirs, pkg: &str, text: &str, repair: bool) -> Result<Menu> {
+pub fn add_to_menu(d: &Dirs, pkg: &str, text: &str, repair: bool) -> Result<Menu> {
     let (Some(app_id), Some(id)) = (d.portal.as_deref(), d.portal_id(pkg)) else {
-        bail!("no portal");
+        return Ok(Menu::None);
     };
     let exec = desktop::read_key(text, "Exec").context("record without Exec")?;
     let want = desktop::exec_args(&exec);
@@ -267,12 +229,7 @@ pub fn remove_app(d: &Dirs, pkg: &str) -> bool {
         eprintln!("innkeeper: {e:#}");
     }
     let had_entry = fs::remove_file(d.app_desktop(pkg)).is_ok();
-    let icons = remove_icons(d, &format!("{PREFIX}{pkg}"));
-    if icons > 0 {
-        update_icon_cache(d);
-    }
-    update_desktop_database(d);
-    had_entry || icons > 0
+    remove_icons(d, &format!("{PREFIX}{pkg}")) > 0 || had_entry
 }
 
 /// The `Name=` of our desktop entry for `pkg`, if any.
@@ -357,38 +314,37 @@ pub fn desktop_apps(d: &Dirs) -> Vec<DesktopApp> {
     v
 }
 
-/// Repairs our app entries. The `Exec` of one that can't run is pointed at
-/// `innkeeper` (this installation's command line, keeping its profile): its
-/// program is gone (Innkeeper moved or was reinstalled elsewhere), or, inside
-/// the Flatpak, it runs anything but `innkeeper`. Inside the Flatpak, a record whose app-menu entry is missing or
-/// runs another command is offered to the portal again, unless the user
-/// declined it. Returns how many were rewritten.
-pub fn refresh_entries(d: &Dirs, innkeeper: &[String]) -> usize {
-    rewrite_entries(d, innkeeper, None)
+/// Repairs our app entries: the `Exec` of one that runs anything but
+/// `innkeeper` is pointed at it, keeping its profile, and a record whose
+/// app-menu entry is missing or runs another command is offered to the
+/// portal again, unless the user declined it. Returns how many were
+/// rewritten.
+pub fn refresh_entries(d: &Dirs) -> usize {
+    rewrite_entries(d, None)
 }
 
 /// Points the entries of profile `from`'s apps at profile `to` (renamed),
 /// as [`refresh_entries`] writes them. Returns how many were rewritten.
-pub fn move_entries(d: &Dirs, innkeeper: &[String], from: &str, to: &str) -> usize {
-    rewrite_entries(d, innkeeper, Some((from, to)))
+pub fn move_entries(d: &Dirs, from: &str, to: &str) -> usize {
+    rewrite_entries(d, Some((from, to)))
 }
 
-fn rewrite_entries(d: &Dirs, innkeeper: &[String], rename: Option<(&str, &str)>) -> usize {
+/// The program desktop entries run, which the DynamicLauncher portal runs as
+/// `flatpak run --command=innkeeper`.
+pub const INNKEEPER: &str = "innkeeper";
+
+fn rewrite_entries(d: &Dirs, rename: Option<(&str, &str)>) -> usize {
     let mut n = 0;
     for (pkg, path, mut text) in app_entries(d) {
         let exec = desktop::read_key(&text, "Exec").unwrap_or_default();
         let args = desktop::exec_args(&exec);
         let inv = paths::invocation(&args);
-        let missing = inv
-            .program
-            .is_some_and(|p| Path::new(p).is_absolute() && !Path::new(p).exists());
-        let elsewhere = d.portal.is_some() && inv.program != innkeeper.first().map(String::as_str);
         let (renamed, profile) = match rename {
             Some((from, to)) if inv.profile == from => (true, to),
             _ => (false, inv.profile),
         };
-        if missing || elsewhere || renamed || inv.program.is_none() {
-            let mut run = paths::command(innkeeper, profile);
+        if inv.program != Some(INNKEEPER) || renamed {
+            let mut run = paths::command(&[INNKEEPER.into()], profile);
             run.extend(["run".into(), pkg.clone()]);
             let Some(mut new) = desktop::exec_line(&run, Some("%U"))
                 .ok()
@@ -410,14 +366,9 @@ fn rewrite_entries(d: &Dirs, innkeeper: &[String], rename: Option<(&str, &str)>)
             }
             text = new;
         }
-        if d.portal.is_some()
-            && let Err(e) = add_to_menu(d, &pkg, &text, true)
-        {
+        if let Err(e) = add_to_menu(d, &pkg, &text, true) {
             eprintln!("innkeeper: {pkg}: app menu: {e:#}");
         }
-    }
-    if n > 0 {
-        update_desktop_database(d);
     }
     n
 }
@@ -481,11 +432,11 @@ mod tests {
         png.extend(48u32.to_be_bytes());
         png.extend(48u32.to_be_bytes());
         // A wrong-size PNG is skipped rather than misfiled.
-        let Menu::File(p) =
-            install_app(&d, &mut e, &[(48, png.clone()), (64, png.clone())]).unwrap()
-        else {
-            panic!("not a file");
-        };
+        assert_eq!(
+            install_app(&d, &mut e, &[(48, png.clone()), (64, png.clone())]).unwrap(),
+            Menu::None
+        );
+        let p = d.app_desktop("org.example.app");
         assert!(p.ends_with("applications/dev.sargunv.innkeeper.org.example.app.desktop"));
         assert!(
             d.icon_path(48, "dev.sargunv.innkeeper.org.example.app")
@@ -533,9 +484,7 @@ mod tests {
             cache: root.join("cache"),
             portal: None,
         };
-        let binary = root.join("innkeeper");
-        fs::write(&binary, "").unwrap();
-        let cli = vec![binary.to_string_lossy().into_owned()];
+        let cli = vec![INNKEEPER.to_string()];
         let entry = |pkg: &str, exec: &str| {
             let p = d.app_desktop(pkg);
             let text =
@@ -556,24 +505,18 @@ mod tests {
         let mut moved_text = fs::read_to_string(&moved).unwrap();
         moved_text.push_str("Actions=NewWindow;\n\n[Desktop Action NewWindow]\nName=New Window\nExec=/gone/innkeeper run --new-window org.ex.moved\n");
         fs::write(&moved, moved_text).unwrap();
-        let fine = entry("org.ex.fine", &want("org.ex.fine", "").unwrap());
-        let on_path = entry("org.ex.path", "innkeeper run org.ex.path %U");
+        let fine = entry("org.ex.fine", &want("org.ex.fine", "p").unwrap());
 
-        assert_eq!(refresh_entries(&d, &cli), 2);
+        assert_eq!(refresh_entries(&d), 2);
         assert_eq!(exec_of(&old), want("org.ex.old", "cli"));
         assert_eq!(exec_profile(&exec_of(&old).unwrap()), "cli");
         assert_eq!(exec_of(&moved), want("org.ex.moved", ""));
         let moved_text = fs::read_to_string(&moved).unwrap();
-        assert!(moved_text.contains(&format!(
-            "Exec={} run --new-window org.ex.moved\n",
-            binary.display()
-        )));
-        assert_eq!(exec_of(&fine), want("org.ex.fine", ""));
-        assert_eq!(
-            exec_of(&on_path).as_deref(),
-            Some("innkeeper run org.ex.path %U")
-        );
-        assert_eq!(refresh_entries(&d, &cli), 0);
+        assert!(moved_text.contains("Exec=innkeeper run --new-window org.ex.moved\n"));
+        assert_eq!(exec_of(&fine), want("org.ex.fine", "p"));
+        assert_eq!(refresh_entries(&d), 0);
+        assert_eq!(move_entries(&d, "p", "q"), 1);
+        assert_eq!(exec_of(&fine), want("org.ex.fine", "q"));
         fs::remove_dir_all(&root).unwrap();
     }
 }

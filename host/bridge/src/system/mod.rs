@@ -658,7 +658,7 @@ mod tests {
         })
         .unwrap();
         assert_eq!(named.name, "Example Player");
-        assert_eq!(named.icon_name, "dev.sargunv.innkeeper.org.example.player");
+        assert_eq!(named.icon_name, "dev.sargunv.Innkeeper.org.example.player");
         assert_eq!(named.id, named.icon_name);
         assert_eq!(named.binary, named.icon_name);
         let bare = mixer_app(&PlaybackApp {

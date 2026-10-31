@@ -3,8 +3,6 @@
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ErrorKind {
-    /// Retained for SDK-based callers; the built-in APK reader needs no aapt.
-    AaptMissing,
     NotAnApk,
     UnsupportedBundle,
     WrongAbi,
@@ -18,7 +16,6 @@ pub enum ErrorKind {
 impl std::fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AaptMissing => f.write_str("APK reader unavailable"),
             Self::NotAnApk => f.write_str("not a readable Android app"),
             Self::UnsupportedBundle => f.write_str("unsupported APK bundle"),
             Self::WrongAbi => f.write_str("incompatible processor architecture"),

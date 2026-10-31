@@ -14,7 +14,7 @@ use crate::apk::{self, ApkInfo};
 use crate::bundle::{self, Input};
 use crate::desktop::{self, AppEntry};
 use crate::launcher::Session;
-use crate::paths::{self, Prefix};
+use crate::paths;
 use crate::xdg::{self, DesktopApp, Dirs};
 use crate::{ErrorKind, validate};
 
@@ -32,21 +32,10 @@ pub type Report<'a> = &'a dyn Fn(Event);
 /// A [`Report`] that ignores everything.
 pub fn quiet(_: Event) {}
 
-/// The command line desktop entries run `innkeeper` with: this
-/// installation's ([`Prefix::cli`]), for this session profile. Inside the
-/// Flatpak it is plain `innkeeper`, which the DynamicLauncher portal runs as
-/// `flatpak run --command=innkeeper`.
+/// The command line desktop entries run `innkeeper` with, for this session
+/// profile ([`xdg::INNKEEPER`]).
 pub fn cli_command() -> Result<Vec<String>> {
-    Ok(paths::command(&innkeeper()?, &paths::profile()?))
-}
-
-/// The `innkeeper` desktop entries run: this installation's, or the Flatpak's
-/// command.
-pub(crate) fn innkeeper() -> Result<Vec<String>> {
-    if Dirs::from_env().portal.is_some() {
-        return Ok(vec!["innkeeper".into()]);
-    }
-    Ok(Prefix::locate()?.cli())
+    Ok(paths::command(&[xdg::INNKEEPER.into()], &paths::profile()?))
 }
 
 /// The running session, after starting it if needed.
@@ -413,7 +402,6 @@ pub fn background(set: Option<(&str, bool)>, report: Report) -> Result<Vec<Strin
 
 /// User apps in the session, with the `Name` of their desktop entry.
 pub fn list(report: Report) -> Result<Vec<(String, Option<String>)>> {
-    refresh_entries();
     let s = session(report)?;
     let d = Dirs::from_env();
     Ok(android::user_packages(&s)?
@@ -460,12 +448,10 @@ pub fn android_packages() -> Option<Vec<String>> {
     android::user_packages(&s).ok()
 }
 
-/// Repairs app entries (see [`xdg::refresh_entries`]): those that can no
-/// longer run point at this installation's `innkeeper`, and inside the
-/// Flatpak missing app-menu entries are offered again. Returns how many
-/// entries were rewritten.
+/// Repairs app entries and offers missing app-menu entries again (see
+/// [`xdg::refresh_entries`]). Returns how many entries were rewritten.
 pub fn refresh_entries() -> usize {
-    innkeeper().map_or(0, |l| xdg::refresh_entries(&Dirs::from_env(), &l))
+    xdg::refresh_entries(&Dirs::from_env())
 }
 
 /// Shown once after the first session starts.

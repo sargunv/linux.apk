@@ -26,7 +26,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use innkeeper_core::desktop::{self, AppEntry};
-use innkeeper_core::{ops, paths, validate, xdg};
+use innkeeper_core::{paths, validate, xdg};
 
 use crate::ipc::blob;
 use crate::ipc::server::{Peer, Reply, Service};
@@ -196,10 +196,7 @@ pub struct Config {
 impl Config {
     pub fn from_env(enabled: bool) -> Config {
         let profile = paths::profile().unwrap_or_default();
-        let mut run = ops::cli_command().unwrap_or_else(|e| {
-            crate::warn!("apps: {e:#}; desktop entries will run `innkeeper` from PATH");
-            paths::command(&["innkeeper".into()], &profile)
-        });
+        let mut run = paths::command(&[xdg::INNKEEPER.into()], &profile);
         run.push("run".into());
         Config {
             enabled,
@@ -288,26 +285,24 @@ impl AppsService {
             splash: None,
             new_window,
         };
-        let cfg = self.cfg.clone();
-        let label = self.label.clone();
-        let mut add = move || match xdg::install_app(&cfg.dirs, &mut entry, &icons) {
-            Ok(m) => {
-                crate::info!("apps: {label}: added {pkg} ({m})");
-                Reply::ok()
-            }
+        // The record is written before the portal's dialog shows, so a HAVE
+        // meanwhile finds it current.
+        let text = match xdg::write_record(&self.cfg.dirs, &mut entry, &icons) {
+            Ok(t) => t,
             Err(e) => {
                 crate::warn!("apps: {pkg}: {e:#}");
-                Reply::err(-EIO)
+                return Reply::err(-EIO);
             }
         };
-        if self.cfg.dirs.portal.is_none() {
-            return add();
-        }
-        // Through the portal the user answers a dialog first; the record is
-        // written before it shows, so a HAVE meanwhile finds it current.
+        let cfg = self.cfg.clone();
+        let label = self.label.clone();
+        let add = move || match xdg::add_to_menu(&cfg.dirs, &pkg, &text, false) {
+            Ok(m) => crate::info!("apps: {label}: added {pkg} ({m})"),
+            Err(e) => crate::warn!("apps: {pkg}: {e:#}"),
+        };
         if let Err(e) = std::thread::Builder::new()
             .name("apps-portal".into())
-            .spawn(move || drop(add()))
+            .spawn(add)
         {
             crate::warn!("apps: spawn: {e}");
             return Reply::err(-EIO);

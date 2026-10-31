@@ -44,7 +44,6 @@ fn classify(
     let app = name.unwrap_or("the app");
     let pair = |h: &str, b: &str| (h.to_string(), b.to_string());
     match kind {
-        Some(AaptMissing) => pair("Innkeeper Isn’t Set Up", "The APK reader is missing. Reinstall Innkeeper and try again."),
         Some(NotAnApk) => pair("Not a Readable Android App", "This file couldn’t be read as an APK or APK bundle. It may be incomplete or corrupt; try downloading it again."),
         Some(UnsupportedBundle) => pair("Unsupported Bundle", "This bundle doesn’t contain exactly one installable app. Encrypted bundles aren’t supported."),
         Some(WrongAbi) => pair("Not Built for This Computer", "This app’s native code doesn’t support this computer’s processor."),
@@ -93,7 +92,6 @@ mod tests {
     #[test]
     fn typed_context_selects_copy_independent_of_diagnostics() {
         for (kind, heading) in [
-            (ErrorKind::AaptMissing, "Innkeeper Isn’t Set Up"),
             (ErrorKind::NotAnApk, "Not a Readable Android App"),
             (ErrorKind::UnsupportedBundle, "Unsupported Bundle"),
             (ErrorKind::WrongAbi, "Not Built for This Computer"),

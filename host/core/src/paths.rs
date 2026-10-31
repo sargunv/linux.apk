@@ -48,16 +48,6 @@ impl Prefix {
     pub fn profile_paths(&self, name: &str) -> Result<innkeeper_session::Paths> {
         innkeeper_session::Paths::for_profile(&self.0, name)
     }
-
-    /// A program in `bin/`.
-    pub fn bin(&self, name: &str) -> PathBuf {
-        self.0.join("bin").join(name)
-    }
-
-    /// The command that runs this installation's CLI.
-    pub fn cli(&self) -> Vec<String> {
-        vec![self.bin("innkeeper").to_string_lossy().into_owned()]
-    }
 }
 
 /// The profile this process works with ([`innkeeper_session::paths::select`]
@@ -68,7 +58,7 @@ pub use innkeeper_session::paths::{profile, select};
 /// `$HOME`.
 pub use innkeeper_session::paths::xdg_home;
 
-/// The argv that runs `program` (a command line, such as [`Prefix::cli`])
+/// The argv that runs `program` (a command line, such as `innkeeper`)
 /// against session `profile`: prefixed with `env INNKEEPER_PROFILE=<profile>`
 /// for a named profile, so a desktop entry reaches the session it was made
 /// for.

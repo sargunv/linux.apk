@@ -66,11 +66,3 @@ pub fn run(cmd: &mut Command, stdin: Stdio, limit: Duration) -> Result<Output> {
         stderr,
     })
 }
-
-/// Looks up `name` on `PATH`.
-pub fn which(name: &str) -> Option<std::path::PathBuf> {
-    let path = std::env::var_os("PATH")?;
-    std::env::split_paths(&path)
-        .map(|d| d.join(name))
-        .find(|p| p.is_file())
-}

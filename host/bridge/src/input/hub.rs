@@ -293,11 +293,7 @@ impl Hub {
             .unwrap()
             .shown
             .insert(r.window, (conn, display));
-        let prefix = format!(
-            "{}.",
-            innkeeper_core::desktop::flatpak_app_id()
-                .unwrap_or_else(|| "dev.sargunv.innkeeper".into())
-        );
+        let prefix = format!("{}.", innkeeper_core::desktop::flatpak_app_id());
         // Android's id uses a lowercase `innkeeper`; the Flatpak id capitalizes it.
         if r.app_id.len() > prefix.len() && r.app_id[..prefix.len()].eq_ignore_ascii_case(&prefix) {
             self.packages

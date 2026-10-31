@@ -22,20 +22,16 @@ own; `cargo test -p innkeeper-core` tests it.
   vector icons get the system mask. The APK's own PNGs are the fallback. Before
   installation, `apk/icon.rs` renders static adaptive and vector layers on the
   host with resvg ([manager limits](../manager/README.md#install-page)).
-- **Desktop entries** (`desktop.rs`, `xdg.rs`):
-  `dev.sargunv.innkeeper.<pkg>.desktop`, with `StartupWMClass` matching the
-  window's `app_id`, custom URL schemes as `x-scheme-handler/*` (never
-  `http(s)`, `file`, `content` or `intent`), and an `Exec` that runs this
-  installation's `innkeeper` for the entry's profile. `xdg::refresh_entries`
-  repairs entries whose program moved.
-- **Inside the Flatpak** (`dynlauncher.rs`) those entries stay in the app's own
-  data dir as its record, and each reaches the app menu through the
-  DynamicLauncher portal, after the user confirms its dialog, as
+- **Desktop entries** (`desktop.rs`, `xdg.rs`, `dynlauncher.rs`): each app's
+  record, `dev.sargunv.innkeeper.<pkg>.desktop`, stays in the Flatpak's own data
+  dir, with custom URL schemes as `x-scheme-handler/*` (never `http(s)`, `file`,
+  `content` or `intent`). It reaches the app menu through the DynamicLauncher
+  portal, after the user confirms its dialog, as
   `dev.sargunv.Innkeeper.<pkg>.desktop` running
-  `flatpak run --command=innkeeper`, which survives updates. Windows,
-  notifications and MPRIS players use that id. Entry repair (`innkeeper list`,
-  manager start) offers an entry again when it is missing or runs another
-  command, unless the user declined it.
+  `flatpak run --command=innkeeper` for the entry's profile, which survives
+  updates. Windows (`StartupWMClass`), notifications and MPRIS players use that
+  id. At manager start, entry repair offers an entry again when it is missing or
+  runs another command, unless the user declined it.
 - **File types:** the system app reports, through `IconDump`, the concrete MIME
   types of each app's exported, enabled, default VIEW filters that accept
   `content://` files. Innkeeper's own desktop entry registers common document,

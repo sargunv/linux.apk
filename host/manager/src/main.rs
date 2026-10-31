@@ -17,8 +17,7 @@ use std::rc::Rc;
 
 use adw::prelude::*;
 use gtk::{gio, glib};
-use innkeeper_core::desktop::{MANAGER_ICON_SVG, MANAGER_ID};
-use innkeeper_core::xdg::Dirs;
+use innkeeper_core::desktop::MANAGER_ID;
 
 use crate::window::Window;
 
@@ -32,18 +31,6 @@ const CSS: &str = "
   background-color: color-mix(in srgb, var(--accent-bg-color) 12%, var(--window-bg-color) 88%); }
 ";
 
-/// Makes the manager's icon findable by name even when it isn't installed
-/// (an unthemed icon in a search path).
-fn register_icon(display: &gtk::gdk::Display) {
-    let dir = Dirs::from_env().cache.join("icons");
-    let file = dir.join(format!("{MANAGER_ID}.svg"));
-    if std::fs::read_to_string(&file).ok().as_deref() != Some(MANAGER_ICON_SVG) {
-        let _ =
-            std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&file, MANAGER_ICON_SVG));
-    }
-    gtk::IconTheme::for_display(display).add_search_path(&dir);
-}
-
 fn main() -> glib::ExitCode {
     let app = adw::Application::builder()
         .application_id(MANAGER_ID)
@@ -53,7 +40,6 @@ fn main() -> glib::ExitCode {
 
     app.connect_startup(|app| {
         let display = gtk::gdk::Display::default().expect("no display");
-        register_icon(&display);
         gtk::Window::set_default_icon_name(MANAGER_ID);
         let css = gtk::CssProvider::new();
         css.load_from_string(CSS);

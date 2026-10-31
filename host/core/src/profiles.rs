@@ -115,9 +115,7 @@ pub fn create(name: &str, settings: &Settings) -> Result<()> {
 /// be stopped.
 pub fn rename(from: &str, to: &str) -> Result<()> {
     profile::rename(&paths(from)?, &paths(to)?)?;
-    if let Ok(cli) = crate::ops::innkeeper() {
-        xdg::move_entries(&Dirs::from_env(), &cli, from, to);
-    }
+    xdg::move_entries(&Dirs::from_env(), from, to);
     if chosen().as_deref() == Some(from) {
         choose(to)?;
     }
