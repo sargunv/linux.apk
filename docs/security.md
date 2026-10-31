@@ -19,7 +19,7 @@ that.
 flowchart LR
   apps["Android apps"] -->|"Android permissions, binder"| sys["system_server, HALs"]
   apps -. "trapped syscalls" .-> broker["broker<br/>(host user's power)"]
-  sys -->|"bridge.sock, per-service uid policy"| bridge["innkeeper-bridge<br/>(the user)"]
+  sys -->|"bridge.sock"| bridge["innkeeper-bridge<br/>(the user)"]
   bridge -->|"portals, D-Bus, Wayland"| desk["desktop"]
   root["Android root = host user"] -->|"Flatpak sandbox"| host["host files the user owns"]
 ```
@@ -42,14 +42,10 @@ flowchart LR
 - The socket directory is linked into Android as `/dev/socket/innkeeper`,
   `root:audio 0750`; the system app gets the `audio` group through its
   `HOST_BRIDGE` permission.
-- `SO_PEERCRED` is checked against the host user.
-- The system app's uid (the owner of its data directory) is admitted to the
-  system, documents, apps and hoststate services; `system` (the Health HAL)
-  reaches hoststate through the allow-list. The **input and a11y services are
-  the system app's alone**: input's lines are the user's keystrokes, and a11y's
-  trees are every app's screen contents and its actions click for the user.
-- One service per connection (HELLO); anything else gets `-EACCES` or `-EPROTO`
-  and is closed.
+- `SO_PEERCRED` is checked against the host user, which every Android process
+  runs as.
+- One service per connection (HELLO); anything else gets `-EPROTO` and is
+  closed.
 
 ## Single-uid mode
 
