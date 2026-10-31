@@ -84,7 +84,7 @@ fn main() -> Result<()> {
     *hub.evdev.lock().unwrap() = Some(innkeeper_bridge::input::evdev::Evdev::new(
         run_dir.join("bridge/evdev.sock"),
     )?);
-    innkeeper_bridge::input::gamepad::start(run_dir.join("bridge/evdev.sock"), test_session);
+    innkeeper_bridge::input::gamepad::start(run_dir.join("bridge/evdev.sock"));
     // Not in the socket directory, which is shared with Android.
     let shared = Shared::new(&run_dir, desktop, hub.clone());
     // The system app names the playing app; each audio connection applies

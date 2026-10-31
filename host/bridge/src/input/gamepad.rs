@@ -388,10 +388,10 @@ fn wait_for_input(polls: &mut [libc::pollfd], next_scan: Instant) {
     }
 }
 
-pub fn start(broker: PathBuf, test_session: bool) {
-    let fake = test_session
-        .then(|| std::env::var_os("INNKEEPER_GAMEPAD_TEST_DIR"))
-        .flatten();
+/// Watches `/dev/input`, or the e2e harness's fake gamepads in
+/// `INNKEEPER_GAMEPAD_TEST_DIR`.
+pub fn start(broker: PathBuf) {
+    let fake = std::env::var_os("INNKEEPER_GAMEPAD_TEST_DIR").filter(|d| !d.is_empty());
     let synthetic = fake.is_some();
     let dir = fake
         .map(PathBuf::from)
