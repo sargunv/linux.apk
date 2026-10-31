@@ -1,32 +1,44 @@
 #!/usr/bin/env bash
 # Hosted runners only: never run privileged setup on a contributor's machine.
+# build: compile, lint and unit-test the sources. runtime: run or package the
+# stage on a software desktop.
 set -euo pipefail
 [[ ${GITHUB_ACTIONS:-} == true ]] || {
   echo 'GitHub runner required' >&2
   exit 1
 }
+mode=${1:?build or runtime}
 sudo apt-get update -qq
-mode=${INNKEEPER_CI_MODE:?}
-if [[ $mode != e2e ]]; then
-  sudo apt-get install -y --no-install-recommends \
-    clang ccache pkg-config libgtk-4-dev libadwaita-1-dev libpulse-dev libxkbcommon-dev
+case $mode in
+  build)
+    sudo apt-get install -y --no-install-recommends \
+      clang ccache pkg-config libgtk-4-dev libadwaita-1-dev libpulse-dev libxkbcommon-dev \
+      podman uidmap passt
+    {
+      echo "CARGO_BUILD_JOBS=4"
+      # Debug symbols and per-checkout incremental state only inflate caches.
+      echo "CARGO_PROFILE_DEV_DEBUG=0"
+      echo "CARGO_PROFILE_TEST_DEBUG=0"
+      echo "CARGO_INCREMENTAL=0"
+      echo "CMAKE_BUILD_PARALLEL_LEVEL=4"
+      echo "CMAKE_C_COMPILER_LAUNCHER=ccache"
+      echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache"
+      echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE"
+      echo "CCACHE_MAXSIZE=500M"
+    } >>"$GITHUB_ENV"
+    ;;
+  runtime) ;;
+  *) exit 2 ;;
+esac
+# The build container, supervisor unit tests and Flatpak need unprivileged mount namespaces.
+sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+# Gralloc's unit tests and Android graphics need real dma-buf allocations.
+if [[ ! -e /dev/udmabuf ]]; then
+  sudo modprobe udmabuf
 fi
-if [[ $mode == build ]]; then
-  sudo apt-get install -y --no-install-recommends podman uidmap passt
-fi
-if [[ $mode == build || $mode == unit || $mode == e2e || $mode == package ]]; then
-  # The build container, supervisor unit tests and Flatpak need unprivileged mount namespaces.
-  sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-fi
-if [[ $mode == unit || $mode == e2e || $mode == package ]]; then
-  # Gralloc's host unit tests also exercise real dma-buf allocations.
-  if [[ ! -e /dev/udmabuf ]]; then
-    sudo modprobe udmabuf
-  fi
-  sudo chmod 666 /dev/udmabuf
-  test -r /dev/udmabuf && test -w /dev/udmabuf
-fi
-[[ $mode == e2e || $mode == package ]] || exit 0
+sudo chmod 666 /dev/udmabuf
+test -r /dev/udmabuf && test -w /dev/udmabuf
+[[ $mode == runtime ]] || exit 0
 sudo apt-get install -y --no-install-recommends \
   podman uidmap passt flatpak fuse3 cpio dbus-user-session gnome-shell mutter \
   xdg-desktop-portal xdg-desktop-portal-gtk \

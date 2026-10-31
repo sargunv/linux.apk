@@ -2,22 +2,20 @@ name: Innkeeper runner
 description: Toolchains and prerequisites for hosted Linux runners
 inputs:
   mode:
-    description: docs, lint, build, unit, e2e or package
+    description:
+      build (compile and unit-test sources) or runtime (run the stage)
     required: true
 runs:
   using: composite
   steps:
     - name: Runner packages and kernel setup
-      if: inputs.mode != 'docs'
       shell: bash
-      run: tools/ci/setup.sh
-      env:
-        INNKEEPER_CI_MODE: ${{ inputs.mode }}
+      run: tools/ci/setup.sh '${{ inputs.mode }}'
     - uses: jdx/mise-action@v5
       with:
         cache: true
     - uses: actions/cache/restore@v4
-      if: inputs.mode == 'build' || inputs.mode == 'unit'
+      if: inputs.mode == 'build'
       id: sdk
       with:
         path: ~/Android/Sdk
@@ -25,7 +23,7 @@ runs:
           sdk-v2-${{ runner.os }}-${{ runner.arch }}-${{
           hashFiles('tools/build/toolchain.env') }}
     - name: Android SDK
-      if: inputs.mode == 'build' || inputs.mode == 'unit'
+      if: inputs.mode == 'build'
       shell: bash
       run: |
         source tools/build/toolchain.env
@@ -44,11 +42,9 @@ runs:
         path: ~/Android/Sdk
         key: ${{ steps.sdk.outputs.cache-primary-key }}
     - uses: actions/cache@v4
-      # Packaging restores a stage and builds a bundle. It does not compile, and
-      # the bundle fills out/ with more files than hashFiles can walk.
-      if:
-        inputs.mode != 'e2e' && inputs.mode != 'docs' && inputs.mode !=
-        'package'
+      # Runtime jobs don't compile, and a bundle fills out/ with more files
+      # than hashFiles can walk.
+      if: inputs.mode == 'build'
       with:
         path: |
           ~/.cargo/registry
@@ -56,23 +52,23 @@ runs:
           out/cargo
           ~/.cache/ccache
         key:
-          compile-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.mode }}-${{
+          compile-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{
           hashFiles('mise.lock', 'Cargo.lock', 'tools/build/toolchain.env')
           }}-${{ hashFiles('**/*.rs', '**/Cargo.toml', '.cargo/**', '**/*.c',
           '**/*.cpp', '**/*.h', '**/CMakeLists.txt', 'CMakePresets.json') }}
         restore-keys: |
-          compile-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.mode }}-${{ hashFiles('mise.lock', 'Cargo.lock', 'tools/build/toolchain.env') }}-
+          compile-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('mise.lock', 'Cargo.lock', 'tools/build/toolchain.env') }}-
     - uses: actions/cache@v4
-      if: inputs.mode == 'build' || inputs.mode == 'unit'
+      if: inputs.mode == 'build'
       with:
         path: |
           ~/.gradle/caches
           ~/.gradle/wrapper
           out/build/system-app
         key:
-          gradle-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.mode }}-${{
+          gradle-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{
           hashFiles('mise.lock', 'tools/build/toolchain.env',
           'android/system-app/**', 'host/bridge/src/ipc/wire-fixtures.txt',
           'host/bridge/src/a11y/snapshot-fixture.txt') }}
         restore-keys: |
-          gradle-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.mode }}-
+          gradle-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-

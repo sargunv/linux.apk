@@ -27,18 +27,6 @@ concurrency:
     format('release-{0}', github.ref) }}
   cancel-in-progress: ${{ github.event_name == 'workflow_run' }}
 
-env:
-  CARGO_BUILD_JOBS: 4
-  CARGO_PROFILE_DEV_DEBUG: 0
-  CARGO_PROFILE_TEST_DEBUG: 0
-  CARGO_INCREMENTAL: 0
-  CMAKE_BUILD_PARALLEL_LEVEL: 4
-  CMAKE_C_COMPILER_LAUNCHER: ccache
-  CMAKE_CXX_COMPILER_LAUNCHER: ccache
-  CCACHE_BASEDIR: ${{ github.workspace }}
-  CCACHE_MAXSIZE: 500M
-  INNKEEPER_IMAGES: ${{ github.workspace }}/out/ci/images
-
 jobs:
   build:
     # A snapshot packages the stage CI already saved. A tag or a manual run
@@ -73,7 +61,7 @@ jobs:
           restore-only: true
       - uses: ./.github/actions/setup
         with:
-          mode: package
+          mode: runtime
       - name: Build the bundle
         env:
           INNKEEPER_RELEASE_VERSION:

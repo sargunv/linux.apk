@@ -2,18 +2,11 @@
 
 ## CI
 
-`CI` runs on pull requests and pushes to main. It classifies the changed paths
-(`changed-paths.sh`), then runs lint and one release build. Unit tests and e2e
-run in parallel on separate runners from that build's `stage` artifact (release
-tarball, test probes and `manifest.tsv`; tarballs keep modes and symlinks). The
-`checks` job is the single required gate: it fails if any applicable job did not
-succeed, so a failed dependency cannot turn into a green skip.
-
-A change touching only README files, `AGENTS.md`, Markdown under `docs/` or
-`LICENSE` runs formatting and script/workflow lint, without Clippy, build or
-runtime tests. Unknown paths, missing history and new branches run everything.
-PRs compare the base and merge commits; pushes compare the previous and current
-commit.
+`CI` runs on pull requests and pushes to main: lint and one release build, then
+unit tests and e2e in parallel on separate runners from that build's `stage`
+artifact (release tarball, test probes and `manifest.tsv`; tarballs keep modes
+and symlinks). The `checks` job is the single required gate: it fails unless
+every job succeeded, so a failed dependency cannot turn into a green skip.
 
 Inspect a run with `gh run view <run-id>`.
 
@@ -29,11 +22,13 @@ asset on it; a newer push cancels one in progress. A tag attaches
 ## Runners
 
 Ubuntu 26.04 supplies the GTK baseline, Mutter and Flatpak. Only `setup.sh`,
-which refuses to run outside GitHub Actions, uses sudo: it installs each job
-mode's packages, enables unprivileged user namespaces, starts the systemd user
-manager and PipeWire, and opens udmabuf (built into the runner's Azure kernel)
-to the runner user. A missing udmabuf fails setup: software Vulkan still needs
-real dma-buf allocations, so a fake device would not test Android graphics.
+which refuses to run outside GitHub Actions, uses sudo: it installs the packages
+of its mode (`build` to compile and unit-test, `runtime` to run or package the
+stage), sets the compiler cache environment, enables unprivileged user
+namespaces, starts the systemd user manager and PipeWire, and opens udmabuf
+(built into the runner's Azure kernel) to the runner user. A missing udmabuf
+fails setup: software Vulkan still needs real dma-buf allocations, so a fake
+device would not test Android graphics.
 
 The GPU-less VM runs headless GNOME Shell/Mutter with surfaceless llvmpipe,
 which unlike KWin's virtual backend needs no DRM node and advertises
@@ -55,7 +50,7 @@ runner; the local default is 25 GiB, and the 8 GiB hard cap is unchanged.
   every source, build script, workflow and toolchain input. An exact hit
   restores the stage and probes APK and skips the build job's setup and build;
   tests still run.
-- **Cargo, ccache, Gradle:** keyed by OS/architecture, job mode and
+- **Cargo, ccache, Gradle:** keyed by OS/architecture, job and
   dependency/toolchain pins, with prefix restores; each tool checks its own
   inputs. Mesa/LLVM and the image tools keep their own input hashes. Cold
   Mesa/LLVM builds fit in the 120-minute build timeout. The package job does not
