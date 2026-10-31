@@ -1,14 +1,11 @@
 # compat
 
-A manual app-troubleshooting harness and nightly CI corpus, never a PR or agent
-loop gate: crate `innkeeper-compat`, run with
-`mise run test:compat -- --only <package>` (usage in the header of
-`src/main.rs`). It installs each app of [corpus.toml](corpus.toml) (pinned
-F-Droid APKs, fetched to `out/test/compat/corpus` and never committed) into a
-session, and records JSON and Markdown under `out/test/compat/<profile>/`.
-`fresh-results.json` contains the current observations, including harness
-errors; `results.json` keeps baseline entries for apps not run or hit by a
-harness error. Nightly CI keeps both in its `compatibility` artifact.
+A manual app-troubleshooting harness, never a PR or agent loop gate: crate
+`innkeeper-compat`, run with `mise run test:compat -- --only <package>,...`
+(usage in the header of `src/main.rs`). It installs each selected app of
+[corpus.toml](corpus.toml) (pinned F-Droid APKs, fetched to
+`out/test/compat/corpus` and never committed) into a session, and writes
+`out/test/compat/<profile>/results.json`. The run fails unless every app works.
 
 Per app (`src/app.rs`): `pm install`, launch through the window manager, watch 8
 s (15 s for games) for crashes, ANRs and death, check window focus, take a
@@ -29,20 +26,11 @@ available for a run.
 - **Results:** works, partly works (the first frame was fine, a later check
   failed), or doesn't work. A session restart during an app is retried once and
   never counts against it.
-- **Nightly regression reporting:** an app worse than in `results.json`, or a
-  measurement over its budget by more than its margin
-  ([budgets.toml](budgets.toml): cold session start, warm app start, idle
-  session memory), fails the run and leaves the baseline alone. These failures
-  never block PRs. Only `--accept` updates the committed baseline. `-- report`
-  renders `results.json` to `out/test/compat/COMPATIBILITY.md` without running
-  apps.
 - **Session:** the named profile `INNKEEPER_PROFILE` (default `compat`) if it is
   running, or else one it starts (headless unless `--window`) and stops at the
-  end. Only a session it starts gets its start time and idle memory measured: it
-  boots, restarts to time a cold start, and idles 90 s. A named profile is a
-  test session, so links are only logged. Run it at nice 0: uiautomator dies
-  when it can't reset its thread priority, so the harness re-runs itself at nice
-  0 when it finds itself niced.
+  end. A named profile is a test session, so links are only logged. Run it at
+  nice 0: uiautomator dies when it can't reset its thread priority, so the
+  harness re-runs itself at nice 0 when it finds itself niced.
 - **Frameworks** in the corpus were identified by hand from each APK's libraries
   and assets (`libflutter.so`, `libhermes.so`, `assets/capacitor.config.json`,
   `libgodot_android.so`, Compose classes, `libgdx.so`, `libmaplibre.so`); there

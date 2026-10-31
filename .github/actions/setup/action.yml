@@ -2,8 +2,8 @@ name: Innkeeper runner
 description: Toolchains and prerequisites for hosted Linux runners
 inputs:
   mode:
-    description: docs, lint, build, unit, e2e, nightly or package
-    default: nightly
+    description: docs, lint, build, unit, e2e or package
+    required: true
 runs:
   using: composite
   steps:
@@ -17,9 +17,7 @@ runs:
       with:
         cache: true
     - uses: actions/cache/restore@v4
-      if:
-        inputs.mode == 'build' || inputs.mode == 'unit' || inputs.mode ==
-        'nightly'
+      if: inputs.mode == 'build' || inputs.mode == 'unit'
       id: sdk
       with:
         path: ~/Android/Sdk
@@ -27,9 +25,7 @@ runs:
           sdk-v2-${{ runner.os }}-${{ runner.arch }}-${{
           hashFiles('tools/build/toolchain.env') }}
     - name: Android SDK
-      if:
-        inputs.mode == 'build' || inputs.mode == 'unit' || inputs.mode ==
-        'nightly'
+      if: inputs.mode == 'build' || inputs.mode == 'unit'
       shell: bash
       run: |
         source tools/build/toolchain.env
@@ -67,9 +63,7 @@ runs:
         restore-keys: |
           compile-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.mode }}-${{ hashFiles('mise.lock', 'Cargo.lock', 'tools/build/toolchain.env') }}-
     - uses: actions/cache@v4
-      if:
-        inputs.mode == 'build' || inputs.mode == 'unit' || inputs.mode ==
-        'nightly'
+      if: inputs.mode == 'build' || inputs.mode == 'unit'
       with:
         path: |
           ~/.gradle/caches
@@ -82,15 +76,3 @@ runs:
           'host/bridge/src/a11y/snapshot-fixture.txt') }}
         restore-keys: |
           gradle-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.mode }}-
-    - uses: actions/cache@v4
-      if: inputs.mode == 'nightly'
-      with:
-        path: out/test/compat/corpus
-        key: corpus-${{ hashFiles('tests/compat/corpus.toml') }}
-    - uses: actions/cache@v4
-      if: inputs.mode == 'nightly'
-      with:
-        path: out/ci/images
-        key:
-          image-${{ hashFiles('image/pin.toml', 'image/*.sh',
-          'image/bootconfig') }}

@@ -10,7 +10,7 @@ if [[ ${INNKEEPER_NESTED:-} != 1 ]]; then
 fi
 cd "$repo"
 for arg in "$@"; do
-  case $arg in fetch | report) exec cargo run -q --release -p innkeeper-compat -- "$@" ;; esac
+  case $arg in fetch) exec cargo run -q --release -p innkeeper-compat -- "$@" ;; esac
 done
 # Keep compat sound off the desktop and give audio assertions a session-only
 # monitor. An externally started session must use this same sink.

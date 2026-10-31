@@ -40,8 +40,7 @@ without opening host apps or dialogs.
 
 - `mise run test:bionic`: manual Android-side HAL diagnostics.
 - `mise run test:compat -- --only <package>`: manual app troubleshooting; see
-  [compat/README.md](compat/README.md). The full corpus runs only in nightly CI.
-  Never trigger, run or wait for it during development or PR work.
+  [compat/README.md](compat/README.md). It refuses to run the whole corpus.
 
 `tests/e2e/audio/capture.sh`, with a fresh `INNKEEPER_PROFILE` after a build, is
 a manual sustained-capture check outside the e2e gate. It first runs the
