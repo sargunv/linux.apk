@@ -911,14 +911,7 @@ impl Supervisor {
         // The opener's (virtual) euid, as the kernel records proc->cred at
         // open.
         let euid = self.vid.creds(pid).map_or(0, |c| c.euid);
-        // NSpid: <this ns> <android ns> [...]; report the Android-namespace pid.
-        let ns_pid = status_field(pid, "NSpid:")
-            .and_then(|v| {
-                let f: Vec<&str> = v.split_whitespace().collect();
-                f.get(1).or(f.first()).and_then(|x| x.parse().ok())
-            })
-            .unwrap_or(pid);
-        let procid = self.broker.open(ns_pid, euid, ctx, flags & O_NONBLOCK != 0);
+        let procid = self.broker.open(pid, euid, ctx, flags & O_NONBLOCK != 0);
         if crate::guest() == crate::Guest::Ohos {
             self.us.tokens.resolve(pid, &crate::ohos::proc_stat);
         }
@@ -926,7 +919,7 @@ impl Supervisor {
         self.us.procs.insert(procid, ps);
         self.fd_index.insert((pid, newfd as u32), procid);
         let _ = self.watch.send(pid);
-        dlog!("open pid={pid} nspid={ns_pid} euid={euid} ctx={ctx} fd={newfd} proc={procid}");
+        dlog!("open pid={pid} euid={euid} ctx={ctx} fd={newfd} proc={procid}");
     }
 
     fn handle_ioctl(&mut self, req: SeccompNotif) {

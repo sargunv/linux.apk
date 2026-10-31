@@ -48,12 +48,10 @@ so it is unit-tested on the host; `src/notify.rs` binds it to real processes:
 - a read with nothing to do leaves its notification unanswered until there is
   work, and stays interruptible, so ptrace and job control work;
 - polling threads get an eventfd in place of their binder fd;
-- `sender_pid` is the pid in Android's namespace and `sender_euid` the opener's
-  virtual;
+- `sender_euid` is the opener's virtual euid;
 - the freezer works as in the kernel, so ActivityManager freezes cached apps
-  (`dumpsys activity` shows `use_freezer=true`): `BINDER_FREEZE` takes the pid
-  in Android's namespace (the kernel's is the host's), and one that waits for
-  its target to drain is answered when it drains or at its timeout
+  (`dumpsys activity` shows `use_freezer=true`): a `BINDER_FREEZE` that waits
+  for its target to drain is answered when it drains or at its timeout
   (`notify.rs`'s monitor thread runs the timer). There is no cgroup freezer in
   the sandbox. `/dev/binderfs/features` (made by the launcher) tells libbinder
   the broker has freeze notifications, extended errors and oneway spam

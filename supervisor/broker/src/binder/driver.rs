@@ -379,8 +379,8 @@ struct Ref {
 
 #[derive(Default)]
 struct Process {
-    /// pid as seen inside the Android pid namespace (reported as sender_pid).
-    ns_pid: i32,
+    /// Reported as sender_pid.
+    pid: i32,
     euid: u32,
     context: u8,
     max_threads: u32,
@@ -519,16 +519,15 @@ impl BinderDriver {
         i
     }
 
-    /// Open a binder device for a process with pid `ns_pid` (in Android's pid
-    /// namespace) and `euid`; `context` is 0=binder, 1=hwbinder,
+    /// Open a binder device for process `pid` with `euid`; `context` is 0=binder, 1=hwbinder,
     /// 2=vndbinder.
-    pub fn open(&mut self, ns_pid: i32, euid: u32, context: u8, nonblock: bool) -> ProcId {
+    pub fn open(&mut self, pid: i32, euid: u32, context: u8, nonblock: bool) -> ProcId {
         let id = self.next_proc;
         self.next_proc += 1;
         self.procs.insert(
             id,
             Process {
-                ns_pid,
+                pid,
                 euid,
                 context: context.min(2),
                 nonblock,
@@ -2387,7 +2386,7 @@ impl BinderDriver {
         let mut targets: Vec<ProcId> = self
             .procs
             .iter()
-            .filter(|(_, p)| p.ns_pid as u32 == info.pid)
+            .filter(|(_, p)| p.pid as u32 == info.pid)
             .map(|(&id, _)| id)
             .collect();
         if targets.is_empty() {
@@ -2541,7 +2540,7 @@ impl BinderDriver {
         };
         let mut found = false;
         for (&id, p) in &self.procs {
-            if p.ns_pid as u32 == pid {
+            if p.pid as u32 == pid {
                 found = true;
                 info.sync_recv |= p.sync_recv as u32 | (self.txns_pending(id) as u32) << 1;
                 info.async_recv |= p.async_recv as u32;
@@ -3328,7 +3327,7 @@ impl BinderDriver {
         td.sender_euid = euid;
         td.sender_pid = from
             .and_then(|(fp, _)| self.procs.get(&fp))
-            .map(|p| p.ns_pid)
+            .map(|p| p.pid)
             .unwrap_or(0);
         td.data_size = b.data_size as u64;
         td.offsets_size = b.offsets_size as u64;
